@@ -170,7 +170,9 @@ type projectInstitution struct {
 }
 
 func (project projectBase) updateMongo() (bson.D, bson.D, error) {
-	return nil, nil, fmt.Errorf("NotImplementedError")
+	filter := bson.D{{"number", project.number}}
+	update := bson.D{{"$set", bson.M{"number": project.number}}}
+	return filter, update, nil
 }
 
 func (project projectPerson) updateMongo() (bson.D, bson.D, error) {
@@ -178,7 +180,10 @@ func (project projectPerson) updateMongo() (bson.D, bson.D, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return filter, update, fmt.Errorf("NotImplementedError")
+	document := update[0].Value.(bson.M)
+	document["applicant"] = project.applicant
+	document["coApplicants"] = project.coApplicants
+	return filter, update, nil
 }
 
 func (project projectInstitution) updateMongo() (bson.D, bson.D, error) {
@@ -186,7 +191,14 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return filter, update, fmt.Errorf("NotImplementedError")
+	document := update[0].Value.(bson.M)
+	document["institution"] = project.institution
+	document["coInstitutions"] = project.coInstitutions
+	document["partInstitutions"] = project.partInstitutions
+	document["speaker"] = project.speaker
+	document["coSpeakers"] = project.coSpeakers
+	document["participants"] = project.participants
+	return filter, update, nil
 }
 
 type projecter interface {
