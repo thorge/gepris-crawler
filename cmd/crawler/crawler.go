@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -18,6 +19,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go4.org/must"
 	"golang.org/x/net/publicsuffix"
 )
@@ -165,16 +169,28 @@ type projectInstitution struct {
 	participants     []string
 }
 
-func (project projectPerson) updateMongo() error {
-	return fmt.Errorf("NotImplementedError")
+func (project projectBase) updateMongo() (bson.D, bson.D, error) {
+	return nil, nil, fmt.Errorf("NotImplementedError")
 }
 
-func (project projectInstitution) updateMongo() error {
-	return fmt.Errorf("NotImplementedError")
+func (project projectPerson) updateMongo() (bson.D, bson.D, error) {
+	filter, update, err := project.projectBase.updateMongo()
+	if err != nil {
+		return nil, nil, err
+	}
+	return filter, update, fmt.Errorf("NotImplementedError")
+}
+
+func (project projectInstitution) updateMongo() (bson.D, bson.D, error) {
+	filter, update, err := project.projectBase.updateMongo()
+	if err != nil {
+		return nil, nil, err
+	}
+	return filter, update, fmt.Errorf("NotImplementedError")
 }
 
 type projecter interface {
-	updateMongo() error
+	updateMongo() (bson.D, bson.D, error)
 	scanDocument(doc *goquery.Document) error
 }
 
@@ -286,7 +302,19 @@ func processProject(projectNumber string) (result projecter, err error) {
 	return result, err
 }
 
+var mongoOpts = options.Update().SetUpsert(true)
+
+func initializeMongo() (*mongo.Collection, error) {
+	if client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost")); err != nil {
+		return nil, err
+	} else {
+		return client.Database("gepris").Collection("projects"), nil
+	}
+}
+
 func main() {
+	coll, err := initializeMongo()
+	check(err)
 	var projectWorkersWaitGroup sync.WaitGroup
 	projectNumbers := make(chan string)
 	projects := make(chan projecter)
@@ -308,8 +336,13 @@ func main() {
 	go func() {
 		defer projectStorageWaitGroup.Done()
 		for project := range projects {
-			err := project.updateMongo()
+			filter, update, err := project.updateMongo()
 			check(err)
+			result, err := coll.UpdateOne(context.TODO(), filter, update, mongoOpts)
+			check(err)
+			if result.UpsertedCount != 1 {
+				logger.Printf("project was not written properly to MongoDB")
+			}
 		}
 	}()
 	index := 3000
