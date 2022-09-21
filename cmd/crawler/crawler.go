@@ -171,7 +171,15 @@ type projectInstitution struct {
 
 func (project projectBase) updateMongo() (bson.D, bson.D, error) {
 	filter := bson.D{{"number", project.number}}
-	update := bson.D{{"$set", bson.M{"number": project.number}}}
+	update := bson.D{{"$set", bson.M{
+		"number":      project.number,
+		"title":       project.title,
+		"startYear":   project.startYear,
+		"endYear":     project.endYear,
+		"discipline":  project.discipline,
+		"url":         project.url,
+		"description": project.description,
+	}}}
 	return filter, update, nil
 }
 
