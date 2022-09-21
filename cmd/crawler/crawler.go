@@ -140,18 +140,74 @@ func init() {
 	}()
 }
 
-type project struct {
+type projectBase struct {
 	number             string
 	title              string
 	startYear, endYear int
 	discipline         string
 	url                string
 	description        string
-	institution        string
-	coInstitutions     []string
-	speaker            string
-	coSpeakers         []string
-	participants       []string
+}
+
+type projectPerson struct {
+	projectBase
+	applicant    string
+	coApplicants []string
+}
+
+type projectInstitution struct {
+	projectBase
+	institution      string
+	coInstitutions   []string
+	partInstitutions []string
+	speaker          string
+	coSpeakers       []string
+	participants     []string
+}
+
+func (project projectPerson) updateMongo() error {
+	return fmt.Errorf("NotImplementedError")
+}
+
+func (project projectInstitution) updateMongo() error {
+	return fmt.Errorf("NotImplementedError")
+}
+
+type projecter interface {
+	updateMongo() error
+	scanDocument(doc *goquery.Document) error
+}
+
+func (project *projectBase) scanDocument(doc *goquery.Document) error {
+	var err error
+	project.title, err = getField(doc.Find("div.details > h1"))
+	check(err)
+	if project.title == "" {
+		return fmt.Errorf("project has no title")
+	}
+	project.discipline, err = getField(doc.Find(`span.name:contains("Fachliche Zuordnung")`).Next())
+	check(err)
+	if project.discipline == "" {
+		return fmt.Errorf("project has no discipline")
+	}
+	project.startYear, project.endYear, err = parseTimespan(doc)
+	check(err)
+	project.description, err = getField(doc.Find("div#projekttext"))
+	check(err)
+	if project.description == "" {
+		return fmt.Errorf("project has no description")
+	}
+	return nil
+}
+
+func (project *projectPerson) scanDocument(doc *goquery.Document) error {
+	project.projectBase.scanDocument(doc)
+	return fmt.Errorf("NotImplementedError")
+}
+
+func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
+	project.projectBase.scanDocument(doc)
+	return fmt.Errorf("NotImplementedError")
 }
 
 var whitespaceRegexp = regexp.MustCompile(`[\p{Z}\n\r\t]+`)
@@ -213,44 +269,27 @@ func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
 	return
 }
 
-func processProject(projectNumber string) (project, error) {
-	var project project
-	project.number = projectNumber
+func processProject(projectNumber string) (result projecter, err error) {
 	url := fmt.Sprintf("https://gepris.dfg.de/gepris/projekt/%v", projectNumber)
-	if body, err := fetchPage(url); err == nil {
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
-		check(err)
-		project.title, err = getField(doc.Find("div.details > h1"))
-		check(err)
-		if project.title == "" {
-			return project, fmt.Errorf("%v has no title", projectNumber)
-		}
-		project.discipline, err = getField(doc.Find(`span.name:contains("Fachliche Zuordnung")`).Next())
-		check(err)
-		if project.discipline == "" {
-			return project, fmt.Errorf("%v has no discipline", projectNumber)
-		}
-		project.startYear, project.endYear, err = parseTimespan(doc)
-		check(err)
-		project.description, err = getField(doc.Find("div#projekttext"))
-		check(err)
-		if project.description == "" {
-			return project, fmt.Errorf("%v has no description", projectNumber)
-		}
-		logger.Println(project.title, "---", project.description)
+	var body string
+	if body, err = fetchPage(url); err != nil {
+		return nil, err
 	}
-	return project, nil
-}
-
-func storeProject(project project) error {
-	logger.Printf("Storage: Received project #%v", project.number)
-	return nil
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+	check(err)
+	if strings.Contains(body, "Antragstellende Institution") {
+		result = &projectInstitution{projectBase: projectBase{number: projectNumber}}
+	} else {
+		result = &projectPerson{projectBase: projectBase{number: projectNumber}}
+	}
+	err = result.scanDocument(doc)
+	return result, err
 }
 
 func main() {
 	var projectWorkersWaitGroup sync.WaitGroup
 	projectNumbers := make(chan string)
-	projects := make(chan project)
+	projects := make(chan projecter)
 	for i := 0; i < numberProjectWorkers; i++ {
 		projectWorkersWaitGroup.Add(1)
 		go func() {
@@ -269,7 +308,7 @@ func main() {
 	go func() {
 		defer projectStorageWaitGroup.Done()
 		for project := range projects {
-			err := storeProject(project)
+			err := project.updateMongo()
 			check(err)
 		}
 	}()
