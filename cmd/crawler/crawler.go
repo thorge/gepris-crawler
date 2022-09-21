@@ -189,6 +189,7 @@ func (project projectPerson) updateMongo() (bson.D, bson.D, error) {
 		return nil, nil, err
 	}
 	document := update[0].Value.(bson.M)
+	document["type"] = "personal"
 	document["applicant"] = project.applicant
 	document["coApplicants"] = project.coApplicants
 	return filter, update, nil
@@ -200,6 +201,7 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D, error) {
 		return nil, nil, err
 	}
 	document := update[0].Value.(bson.M)
+	document["type"] = "institutional"
 	document["institution"] = project.institution
 	document["coInstitutions"] = project.coInstitutions
 	document["partInstitutions"] = project.partInstitutions
