@@ -375,11 +375,16 @@ func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
 func processProject(projectNumber string) (result projecter, err error) {
 	url := fmt.Sprintf("https://gepris.dfg.de/gepris/projekt/%v", projectNumber)
 	var body string
-	if body, err = fetchPage(url); err != nil {
-		return nil, err
+	if bodyRaw, err := os.ReadFile(fmt.Sprintf("project-pages/%v.html", projectNumber)); err != nil {
+		if body, err = fetchPage(url); err != nil {
+			return nil, err
+		}
+		err = os.WriteFile(fmt.Sprintf("project-pages/%v.html", projectNumber), []byte(body), 0666)
+		check(err)
+	} else {
+		logger.Printf("INFO: Could take page from cache")
+		body = string(bodyRaw)
 	}
-	err = os.WriteFile(fmt.Sprintf("project-pages/%v.html", projectNumber), []byte(body), 0666)
-	check(err)
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
 	check(err)
 	if strings.Contains(body, "Antragstellende Institution") {
