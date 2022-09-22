@@ -348,7 +348,8 @@ func getField(s *goquery.Selection) (value string, err error) {
 }
 
 var timespanRegex = regexp.MustCompile(`Förderung von (\d\d\d\d) bis (\d\d\d\d)|` +
-	`Förderung seit (\d\d\d\d)|Förderung in (\d\d\d\d)`)
+	`Förderung seit (\d\d\d\d)|Förderung in (\d\d\d\d)|Förderung: Bis (\d\d\d\d)|` +
+	`Befindet sich in der laufenden Förderung.`)
 
 func mustAtoi(s string) (i int) {
 	i, err := strconv.Atoi(s)
@@ -365,12 +366,14 @@ func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
 	}
 	matches := timespanRegex.FindStringSubmatch(timespan)
 	if len(matches) != 0 {
-		if matches[4] != "" {
+		if matches[5] != "" {
+			end = mustAtoi(matches[5])
+		} else if matches[4] != "" {
 			start = mustAtoi(matches[4])
 			end = start
 		} else if matches[3] != "" {
 			start = mustAtoi(matches[3])
-		} else {
+		} else if matches[1] != "" && matches[2] != "" {
 			start = mustAtoi(matches[1])
 			end = mustAtoi(matches[2])
 		}
