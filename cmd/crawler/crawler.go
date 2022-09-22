@@ -63,7 +63,7 @@ const (
 	resultsPerPage       = 50
 )
 
-var ticker = make(chan time.Time, 50)
+var ticker = make(chan time.Time, maxRequestsPerSec)
 
 var ErrNoFurtherResults = errors.New("no further search results")
 var searchResultRegexp = regexp.MustCompile(`<a class="intern" href="/gepris/projekt/(?P<projectNumber>\d+)">mehr</a>`)
