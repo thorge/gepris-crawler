@@ -166,7 +166,7 @@ type projectInstitution struct {
 	partInstitutions []string
 	speaker          string
 	coSpeakers       []string
-	participants     []string
+	partPeople       []string
 }
 
 func (project projectBase) updateMongo() (bson.D, bson.D, error) {
@@ -207,7 +207,7 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D, error) {
 	document["partInstitutions"] = project.partInstitutions
 	document["speaker"] = project.speaker
 	document["coSpeakers"] = project.coSpeakers
-	document["participants"] = project.participants
+	document["partPeople"] = project.partPeople
 	return filter, update, nil
 }
 
