@@ -280,7 +280,37 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 
 func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	project.projectBase.scanDocument(doc)
-	return fmt.Errorf("NotImplementedError")
+	if results := parseLinkList(doc.Find(`span.name:contains("Antragstellende Institution")`).Next()); len(results) != 1 {
+		return fmt.Errorf("number of applying institutions was not 1 but %v", len(results))
+	} else {
+		project.institution = results[0]
+	}
+	project.coInstitutions = parseLinkList(doc.Find(`span.name:contains("Mitantragstellende Institution")`).Next())
+	if len(project.coInstitutions) != 0 {
+		logger.Printf("DEBUG: found %v co-applying institutions", len(project.coInstitutions))
+	}
+	project.partInstitutions = parseLinkList(doc.Find(`span.name:contains("Beteiligte Einrichtung")`).Next())
+	if len(project.partInstitutions) != 0 {
+		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
+	}
+	if results := parseLinkList(doc.Find(`span.name:contains("Sprecher"), span.name:contains("Sprecherin")` +
+		`span.name:contains("Leiter"), span.name:contains("Leiterin")`).Next()); len(results) != 1 {
+		return fmt.Errorf("number of speakers was not 1 but %v", len(results))
+	} else {
+		project.speaker = results[0]
+	}
+	if len(project.coSpeakers) != 0 {
+		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
+	}
+	project.coSpeakers = parseLinkList(doc.Find(`span.name:contains("Co-Sprecherinnen / Co-Sprecher")`).Next())
+	if len(project.coSpeakers) != 0 {
+		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
+	}
+	project.partPeople = parseLinkList(doc.Find(`span.name:contains("Beteiligte Personen")`).Next())
+	if len(project.partPeople) != 0 {
+		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
+	}
+	return nil
 }
 
 var whitespaceRegexp = regexp.MustCompile(`[\p{Z}\n\r\t]+`)
