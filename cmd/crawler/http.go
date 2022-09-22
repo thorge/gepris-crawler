@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -26,7 +26,7 @@ func fetchPage(url string) (string, error) {
 		<-ticker
 		resp, err := client.Get(url)
 		if err == nil {
-			bodyRaw, err := ioutil.ReadAll(resp.Body)
+			bodyRaw, err := io.ReadAll(resp.Body)
 			check(err)
 			must.Close(resp.Body)
 			body = string(bodyRaw)
