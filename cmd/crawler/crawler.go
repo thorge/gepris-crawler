@@ -456,8 +456,7 @@ func main() {
 			}
 		}
 	}()
-	// FixMe: This must be 0
-	index := 3000
+	index := 0
 	for {
 		err := getSearchResults(index, projectNumbers)
 		if errors.Is(err, ErrNoFurtherResults) {
@@ -466,8 +465,6 @@ func main() {
 			logger.Println("ERROR:", err)
 		}
 		index += resultsPerPage
-		// FixMe: This break must be deleted
-		break
 	}
 	close(projectNumbers)
 	projectWorkersWaitGroup.Wait()
