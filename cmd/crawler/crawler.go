@@ -156,6 +156,7 @@ type projectBase struct {
 type projectPerson struct {
 	projectBase
 	applicant  string
+	partPeople []string
 }
 
 type projectInstitution struct {
@@ -190,6 +191,7 @@ func (project projectPerson) updateMongo() (bson.D, bson.D, error) {
 	document := update[0].Value.(bson.M)
 	document["type"] = "personal"
 	document["applicant"] = project.applicant
+	document["partPeople"] = project.partPeople
 	return filter, update, nil
 }
 
@@ -223,6 +225,13 @@ func parseDisciplines(doc *goquery.Document) (disciplines []string) {
 	return
 }
 
+func parseLinkList(s *goquery.Selection) (elements []string) {
+	s.Find("a.intern").Each(func(i int, s *goquery.Selection) {
+		elements = append(elements, normalizeString(s.Text()))
+	})
+	return
+}
+
 func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	var err error
 	project.title, err = getField(doc.Find("div.details > h1"))
@@ -246,7 +255,17 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 
 func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	project.projectBase.scanDocument(doc)
-	return fmt.Errorf("NotImplementedError")
+	if results := parseLinkList(doc.Find(`span.name:contains("Antragsteller"), span.name:contains("Antragstellerin")`).
+		Next()); len(results) != 1 {
+		return fmt.Errorf("ERROR: number of applicants was not 1 but %v", len(results))
+	} else {
+		project.applicant = results[0]
+	}
+	project.partPeople = parseLinkList(doc.Find(`span.name:contains("Beteiligte Personen")`).Next())
+	if len(project.partPeople) != 0 {
+		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
+	}
+	return nil
 }
 
 func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
