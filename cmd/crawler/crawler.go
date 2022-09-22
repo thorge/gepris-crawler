@@ -403,6 +403,7 @@ func main() {
 			}
 		}
 	}()
+	// FixMe: This must be 0
 	index := 3000
 	for {
 		err := getSearchResults(index, projectNumbers)
@@ -412,6 +413,7 @@ func main() {
 			logger.Println("ERROR:", err)
 		}
 		index += resultsPerPage
+		// FixMe: This break must be deleted
 		break
 	}
 	close(projectNumbers)
