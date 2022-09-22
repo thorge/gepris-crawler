@@ -348,6 +348,8 @@ func processProject(projectNumber string) (result projecter, err error) {
 	if body, err = fetchPage(url); err != nil {
 		return nil, err
 	}
+	err = os.WriteFile(fmt.Sprintf("project-pages/%v.html", projectNumber), []byte(body), 0666)
+	check(err)
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
 	check(err)
 	if strings.Contains(body, "Antragstellende Institution") {
