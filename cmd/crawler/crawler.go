@@ -421,7 +421,7 @@ func main() {
 	coll, err := initializeMongo()
 	check(err)
 	var projectWorkersWaitGroup sync.WaitGroup
-	projectNumbers := make(chan string)
+	projectNumbers := make(chan string, 10*numberProjectWorkers)
 	projects := make(chan projecter)
 	for i := 0; i < numberProjectWorkers; i++ {
 		projectWorkersWaitGroup.Add(1)
