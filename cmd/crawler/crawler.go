@@ -148,7 +148,7 @@ type projectBase struct {
 	number             string
 	title              string
 	startYear, endYear int
-	discipline         string
+	disciplines        []string
 	url                string
 	description        string
 }
@@ -176,7 +176,7 @@ func (project projectBase) updateMongo() (bson.D, bson.D, error) {
 		"title":       project.title,
 		"startYear":   project.startYear,
 		"endYear":     project.endYear,
-		"discipline":  project.discipline,
+		"disciplines": project.disciplines,
 		"url":         project.url,
 		"description": project.description,
 	}}}
@@ -216,6 +216,15 @@ type projecter interface {
 	scanDocument(doc *goquery.Document) error
 }
 
+func parseDisciplines(doc *goquery.Document) (disciplines []string) {
+	doc.Find(`span.name:contains("Fachliche Zuordnung")`).Next().FilterFunction(func(i int, s *goquery.Selection) bool {
+		return s.Nodes[0].Type == 3
+	}).Each(func(i int, s *goquery.Selection) {
+		disciplines = append(disciplines, normalizeString(s.Text()))
+	})
+	return
+}
+
 func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	var err error
 	project.title, err = getField(doc.Find("div.details > h1"))
@@ -223,9 +232,8 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	if project.title == "" {
 		return fmt.Errorf("project has no title")
 	}
-	project.discipline, err = getField(doc.Find(`span.name:contains("Fachliche Zuordnung")`).Next())
-	check(err)
-	if project.discipline == "" {
+	project.disciplines = parseDisciplines(doc)
+	if len(project.disciplines) == 0 {
 		return fmt.Errorf("project has no discipline")
 	}
 	project.startYear, project.endYear, err = parseTimespan(doc)
