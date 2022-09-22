@@ -32,7 +32,7 @@ import (
 // panic is the only appropriate reaction, this function should not be used.
 func check(e error) {
 	if e != nil {
-		logger.Panic("FATAL:", e)
+		logger.Panicln("FATAL:", e)
 	}
 }
 
@@ -353,7 +353,7 @@ var timespanRegex = regexp.MustCompile(`Förderung von (\d\d\d\d) bis (\d\d\d\d)
 func mustAtoi(s string) (i int) {
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		logger.Panic("FATAL:", err)
+		logger.Panicln("FATAL:", err)
 	}
 	return
 }
@@ -375,7 +375,7 @@ func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
 			end = mustAtoi(matches[2])
 		}
 	} else {
-		logger.Panic("FATAL:", timespan, "could not be matched")
+		logger.Panicln("FATAL:", timespan, "could not be matched")
 	}
 	return
 }
