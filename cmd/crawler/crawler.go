@@ -418,21 +418,22 @@ var indexModel = mongo.IndexModel{
 	Keys: bson.D{{"number", 1}},
 }
 
-func initializeMongo() (*mongo.Collection, error) {
+func initializeMongo() (*mongo.Client, *mongo.Collection, error) {
 	if client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost")); err != nil {
-		return nil, err
+		return nil, nil, err
 	} else {
 		coll := client.Database("gepris").Collection("projects")
 		name, err := coll.Indexes().CreateOne(context.TODO(), indexModel)
 		check(err)
 		logger.Printf("INFO: Created index %v", name)
-		return coll, nil
+		return client, coll, nil
 	}
 }
 
 func main() {
-	coll, err := initializeMongo()
+	mongoClient, coll, err := initializeMongo()
 	check(err)
+	defer func() { err := mongoClient.Disconnect(context.TODO()); check(err) }()
 	var projectWorkersWaitGroup sync.WaitGroup
 	projectNumbers := make(chan string, 10*numberProjectWorkers)
 	projects := make(chan projecter)
