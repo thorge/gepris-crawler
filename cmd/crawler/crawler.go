@@ -107,15 +107,23 @@ func fetchPage(url string) (string, error) {
 func getSearchResults(index int, projectNumbers chan<- string) error {
 	url := fmt.Sprintf("https://gepris.dfg.de/gepris/OCTOPUS?context=projekt&findButton=historyCall&"+
 		"hitsPerPage=%v&index=%v&task=doKatalog", resultsPerPage, index)
-	if body, err := fetchPage(url); err != nil {
-		return err
+	var body string
+	filename := fmt.Sprintf("search-results/%v_50.html", index)
+	if bodyRaw, err := os.ReadFile(filename); err != nil {
+		if body, err = fetchPage(url); err != nil {
+			return err
+		}
+		err = os.WriteFile(filename, []byte(body), 0666)
+		check(err)
 	} else {
-		if strings.Contains(body, `<p class="warning">Ihre Suche ergab leider keine Treffer.</p>`) {
-			return ErrNoFurtherResults
-		} else {
-			for _, matches := range searchResultRegexp.FindAllStringSubmatch(body, -1) {
-				projectNumbers <- matches[1]
-			}
+		logger.Printf("INFO: Could take search results from cache")
+		body = string(bodyRaw)
+	}
+	if strings.Contains(body, `<p class="warning">Ihre Suche ergab leider keine Treffer.</p>`) {
+		return ErrNoFurtherResults
+	} else {
+		for _, matches := range searchResultRegexp.FindAllStringSubmatch(body, -1) {
+			projectNumbers <- matches[1]
 		}
 	}
 	return nil
