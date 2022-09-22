@@ -248,7 +248,9 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	project.description, err = getField(doc.Find("div#projekttext"))
 	check(err)
 	if project.description == "" {
-		return fmt.Errorf("project has no description")
+		return fmt.Errorf("WARNING: project has no description (not even empty)")
+	} else if project.description == "Keine Zusammenfassung vorhanden" {
+		project.description = ""
 	}
 	return nil
 }
