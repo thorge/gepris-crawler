@@ -31,7 +31,7 @@ import (
 // panic is the only appropriate reaction, this function should not be used.
 func check(e error) {
 	if e != nil {
-		logger.Panic(e)
+		logger.Panic("FATAL:", e)
 	}
 }
 
@@ -71,7 +71,7 @@ var searchResultRegexp = regexp.MustCompile(`<a class="intern" href="/gepris/pro
 var client http.Client
 
 func fetchPage(url string) (string, error) {
-	logger.Printf("fetching %v", url)
+	logger.Printf("INFO: fetching %v", url)
 	var body string
 	triesLeft := triesLeft
 	for {
@@ -85,14 +85,14 @@ func fetchPage(url string) (string, error) {
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				break
 			} else {
-				logger.Printf("The HTTP request for %v failed with status code %v: %v",
+				logger.Printf("WARNING: The HTTP request for %v failed with status code %v: %v",
 					url, resp.StatusCode, body)
 				if resp.StatusCode < 500 || resp.StatusCode >= 600 {
 					return "", fmt.Errorf("Giving up on %v.", url)
 				}
 			}
 		} else {
-			logger.Printf("The HTTP request for %v failed without status code: %v", url, err)
+			logger.Printf("WARNING: The HTTP request for %v failed without status code: %v", url, err)
 		}
 		triesLeft--
 		if triesLeft == 0 {
@@ -125,7 +125,7 @@ func init() {
 		// Dial is the original function, plus a line in the log.  This way,
 		// one can see how many HTTP connections are established.
 		Dial: func(network, addr string) (net.Conn, error) {
-			logger.Println("Dial!")
+			logger.Println("DEBUG: Dial!")
 			return net.Dial(network, addr)
 		},
 		MaxIdleConnsPerHost: numberSearchWorkers + numberProjectWorkers,
@@ -138,7 +138,7 @@ func init() {
 			select {
 			case ticker <- t:
 			default:
-				logger.Println("Workers slower than rate limiter")
+				logger.Println("DEBUG: Workers slower than rate limiter")
 			}
 		}
 	}()
@@ -244,7 +244,7 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	project.process, err = getField(doc.Find(`span.name:contains("DFG-Verfahren")`).Next())
 	check(err)
 	if project.process == "" {
-		return fmt.Errorf("ERROR: project has no DFG process")
+		return fmt.Errorf("project has no DFG process")
 	}
 	project.disciplines = parseDisciplines(doc)
 	if len(project.disciplines) == 0 {
@@ -266,7 +266,7 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	project.projectBase.scanDocument(doc)
 	if results := parseLinkList(doc.Find(`span.name:contains("Antragsteller"), span.name:contains("Antragstellerin")`).
 		Next()); len(results) != 1 {
-		return fmt.Errorf("ERROR: number of applicants was not 1 but %v", len(results))
+		return fmt.Errorf("number of applicants was not 1 but %v", len(results))
 	} else {
 		project.applicant = results[0]
 	}
@@ -314,7 +314,7 @@ var timespanRegex = regexp.MustCompile(`Förderung von (\d\d\d\d) bis (\d\d\d\d)
 func mustAtoi(s string) (i int) {
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		logger.Panic(err)
+		logger.Panic("FATAL:", err)
 	}
 	return
 }
@@ -336,7 +336,7 @@ func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
 			end = mustAtoi(matches[2])
 		}
 	} else {
-		logger.Panic(timespan, "could not be matched")
+		logger.Panic("FATAL:", timespan, "could not be matched")
 	}
 	return
 }
@@ -380,7 +380,7 @@ func main() {
 			defer projectWorkersWaitGroup.Done()
 			for projectNumber := range projectNumbers {
 				if project, err := processProject(projectNumber); err != nil {
-					logger.Printf("Error while processing #%v: %v", projectNumber, err)
+					logger.Printf("ERROR: While processing #%v: %v", projectNumber, err)
 				} else {
 					projects <- project
 				}
@@ -397,7 +397,7 @@ func main() {
 			result, err := coll.UpdateOne(context.TODO(), filter, update, mongoOpts)
 			check(err)
 			if result.UpsertedCount != 1 {
-				logger.Printf("project was not written properly to MongoDB")
+				logger.Printf("ERROR: project was not written properly to MongoDB")
 			}
 		}
 	}()
@@ -407,7 +407,7 @@ func main() {
 		if errors.Is(err, ErrNoFurtherResults) {
 			break
 		} else if err != nil {
-			logger.Println(err)
+			logger.Println("ERROR:", err)
 		}
 		index += resultsPerPage
 		break
