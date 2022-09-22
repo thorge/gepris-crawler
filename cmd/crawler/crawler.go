@@ -79,10 +79,10 @@ func fetchPage(url string) (string, error) {
 		<-ticker
 		resp, err := client.Get(url)
 		if err == nil {
-			body_raw, err := ioutil.ReadAll(resp.Body)
+			bodyRaw, err := ioutil.ReadAll(resp.Body)
 			check(err)
 			must.Close(resp.Body)
-			body = string(body_raw)
+			body = string(bodyRaw)
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				break
 			} else {
