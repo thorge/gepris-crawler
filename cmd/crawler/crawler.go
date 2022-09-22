@@ -414,11 +414,19 @@ func processProject(projectNumber string) (result projecter, err error) {
 
 var mongoOpts = options.Update().SetUpsert(true)
 
+var indexModel = mongo.IndexModel{
+	Keys: bson.D{{"number", 1}},
+}
+
 func initializeMongo() (*mongo.Collection, error) {
 	if client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost")); err != nil {
 		return nil, err
 	} else {
-		return client.Database("gepris").Collection("projects"), nil
+		coll := client.Database("gepris").Collection("projects")
+		name, err := coll.Indexes().CreateOne(context.TODO(), indexModel)
+		check(err)
+		logger.Printf("INFO: Created index %v", name)
+		return coll, nil
 	}
 }
 
