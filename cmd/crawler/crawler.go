@@ -215,8 +215,8 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D) {
 }
 
 type projecter interface {
-	updateMongo() (bson.D, bson.D)
 	scanDocument(doc *goquery.Document) error
+	updateMongo() (bson.D, bson.D)
 }
 
 func parseDisciplines(doc *goquery.Document) (disciplines []string) {
