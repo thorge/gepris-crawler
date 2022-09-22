@@ -65,8 +65,6 @@ const (
 
 var ticker = make(chan time.Time, 50)
 
-// https://gepris.dfg.de/gepris/OCTOPUS?context=projekt&findButton=historyCall&hitsPerPage=50&index=50&task=doKatalog
-
 var ErrNoFurtherResults = errors.New("no further search results")
 var searchResultRegexp = regexp.MustCompile(`<a class="intern" href="/gepris/projekt/(?P<projectNumber>\d+)">mehr</a>`)
 var client http.Client
