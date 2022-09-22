@@ -272,7 +272,9 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 }
 
 func (project *projectPerson) scanDocument(doc *goquery.Document) error {
-	project.projectBase.scanDocument(doc)
+	if err := project.projectBase.scanDocument(doc); err != nil {
+		return err
+	}
 	if results := parseLinkList(doc.Find(`span.name:contains("Antragsteller"), span.name:contains("Antragstellerin")`).
 		Next()); len(results) != 1 {
 		return fmt.Errorf("number of applicants was not 1 but %v", len(results))
@@ -287,7 +289,9 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 }
 
 func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
-	project.projectBase.scanDocument(doc)
+	if err := project.projectBase.scanDocument(doc); err != nil {
+		return err
+	}
 	if results := parseLinkList(doc.Find(`span.name:contains("Antragstellende Institution")`).Next()); len(results) != 1 {
 		return fmt.Errorf("number of applying institutions was not 1 but %v", len(results))
 	} else {
