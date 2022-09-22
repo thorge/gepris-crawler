@@ -177,7 +177,7 @@ type projectInstitution struct {
 	partPeople       []string
 }
 
-func (project projectBase) updateMongo() (bson.D, bson.D, error) {
+func (project projectBase) updateMongo() (bson.D, bson.D) {
 	filter := bson.D{{"number", project.number}}
 	update := bson.D{{"$set", bson.M{
 		"number":      project.number,
@@ -189,26 +189,20 @@ func (project projectBase) updateMongo() (bson.D, bson.D, error) {
 		"url":         project.url,
 		"description": project.description,
 	}}}
-	return filter, update, nil
+	return filter, update
 }
 
-func (project projectPerson) updateMongo() (bson.D, bson.D, error) {
-	filter, update, err := project.projectBase.updateMongo()
-	if err != nil {
-		return nil, nil, err
-	}
+func (project projectPerson) updateMongo() (bson.D, bson.D) {
+	filter, update := project.projectBase.updateMongo()
 	document := update[0].Value.(bson.M)
 	document["type"] = "personal"
 	document["applicant"] = project.applicant
 	document["partPeople"] = project.partPeople
-	return filter, update, nil
+	return filter, update
 }
 
-func (project projectInstitution) updateMongo() (bson.D, bson.D, error) {
-	filter, update, err := project.projectBase.updateMongo()
-	if err != nil {
-		return nil, nil, err
-	}
+func (project projectInstitution) updateMongo() (bson.D, bson.D) {
+	filter, update := project.projectBase.updateMongo()
 	document := update[0].Value.(bson.M)
 	document["type"] = "institutional"
 	document["institution"] = project.institution
@@ -217,11 +211,11 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D, error) {
 	document["speaker"] = project.speaker
 	document["coSpeakers"] = project.coSpeakers
 	document["partPeople"] = project.partPeople
-	return filter, update, nil
+	return filter, update
 }
 
 type projecter interface {
-	updateMongo() (bson.D, bson.D, error)
+	updateMongo() (bson.D, bson.D)
 	scanDocument(doc *goquery.Document) error
 }
 
@@ -453,8 +447,7 @@ func main() {
 	go func() {
 		defer projectStorageWaitGroup.Done()
 		for project := range projects {
-			filter, update, err := project.updateMongo()
-			check(err)
+			filter, update := project.updateMongo()
 			update[0].Value.(bson.M)["lastModification"] = primitive.Timestamp{T: uint32(time.Now().Unix())}
 			result, err := coll.UpdateOne(context.TODO(), filter, update, mongoOpts)
 			check(err)
