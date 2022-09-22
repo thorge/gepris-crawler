@@ -147,6 +147,7 @@ func init() {
 type projectBase struct {
 	number             string
 	title              string
+	process            string
 	startYear, endYear int
 	disciplines        []string
 	url                string
@@ -174,6 +175,7 @@ func (project projectBase) updateMongo() (bson.D, bson.D, error) {
 	update := bson.D{{"$set", bson.M{
 		"number":      project.number,
 		"title":       project.title,
+		"process":     project.process,
 		"startYear":   project.startYear,
 		"endYear":     project.endYear,
 		"disciplines": project.disciplines,
@@ -238,6 +240,11 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	check(err)
 	if project.title == "" {
 		return fmt.Errorf("project has no title")
+	}
+	project.process, err = getField(doc.Find(`span.name:contains("DFG-Verfahren")`).Next())
+	check(err)
+	if project.process == "" {
+		return fmt.Errorf("ERROR: project has no DFG process")
 	}
 	project.disciplines = parseDisciplines(doc)
 	if len(project.disciplines) == 0 {
