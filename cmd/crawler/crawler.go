@@ -155,8 +155,7 @@ type projectBase struct {
 
 type projectPerson struct {
 	projectBase
-	applicant    string
-	coApplicants []string
+	applicant  string
 }
 
 type projectInstitution struct {
@@ -191,7 +190,6 @@ func (project projectPerson) updateMongo() (bson.D, bson.D, error) {
 	document := update[0].Value.(bson.M)
 	document["type"] = "personal"
 	document["applicant"] = project.applicant
-	document["coApplicants"] = project.coApplicants
 	return filter, update, nil
 }
 
