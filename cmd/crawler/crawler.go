@@ -20,6 +20,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go4.org/must"
@@ -394,6 +395,7 @@ func main() {
 		for project := range projects {
 			filter, update, err := project.updateMongo()
 			check(err)
+			update[0].Value.(bson.M)["lastModification"] = primitive.Timestamp{T: uint32(time.Now().Unix())}
 			result, err := coll.UpdateOne(context.TODO(), filter, update, mongoOpts)
 			check(err)
 			if result.UpsertedCount != 1 {
