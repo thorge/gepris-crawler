@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
+	github.com/go-chi/chi/v5 v5.0.7
 	go.mongodb.org/mongo-driver v1.10.2
 	go4.org v0.0.0-20201209231011-d4a079459e60
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
