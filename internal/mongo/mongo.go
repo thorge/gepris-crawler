@@ -20,13 +20,13 @@ var indexModel = mongo.IndexModel{
 // InitializeMongo makes the connection to the MongoDB, creates the database
 // “gepris” with the collection “projects” and the index for the “number”
 // field.  Everything of this that already exists is left as is.
-func InitializeMongo(centralLogger *log.Logger) (*mongo.Client, *mongo.Collection, error) {
+func InitializeMongo(ctx context.Context, centralLogger *log.Logger) (*mongo.Client, *mongo.Collection, error) {
 	logger = centralLogger
-	if client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost")); err != nil {
+	if client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost")); err != nil {
 		return nil, nil, err
 	} else {
 		coll := client.Database("gepris").Collection("projects")
-		name, err := coll.Indexes().CreateOne(context.TODO(), indexModel)
+		name, err := coll.Indexes().CreateOne(ctx, indexModel)
 		check(err)
 		logger.Printf("INFO: Created index %v", name)
 		return client, coll, nil

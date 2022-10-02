@@ -133,7 +133,7 @@ func getSearchResults(index int, projectNumbers chan<- string) error {
 // All three are connected with channels: “projectNumbers” between (1) and (2),
 // and “projects” between (2) and (3).
 func main() {
-	mongoClient, coll, err := mongo.InitializeMongo(logger)
+	mongoClient, coll, err := mongo.InitializeMongo(context.TODO(), logger)
 	check(err)
 	defer func() { err := mongoClient.Disconnect(context.TODO()); check(err) }()
 	var projectWorkersWaitGroup sync.WaitGroup
