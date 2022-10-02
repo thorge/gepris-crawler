@@ -19,6 +19,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+
+	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/mongo"
 )
 
 // check panics if its argument is non-nil.  It marks locations that should be
@@ -131,7 +133,7 @@ func getSearchResults(index int, projectNumbers chan<- string) error {
 // All three are connected with channels: “projectNumbers” between (1) and (2),
 // and “projects” between (2) and (3).
 func main() {
-	mongoClient, coll, err := initializeMongo()
+	mongoClient, coll, err := mongo.InitializeMongo(logger)
 	check(err)
 	defer func() { err := mongoClient.Disconnect(context.TODO()); check(err) }()
 	var projectWorkersWaitGroup sync.WaitGroup
@@ -156,8 +158,8 @@ func main() {
 		defer projectStorageWaitGroup.Done()
 		for project := range projects {
 			filter, update := project.updateMongo()
-			updateLastModificationTimestamp(update)
-			result, err := coll.UpdateOne(context.TODO(), filter, update, mongoOpts)
+			mongo.UpdateLastModificationTimestamp(update)
+			result, err := coll.UpdateOne(context.TODO(), filter, update, mongo.MongoOpts)
 			check(err)
 			if result.UpsertedCount != 1 {
 				logger.Printf("ERROR: project was not written properly to MongoDB")
