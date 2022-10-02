@@ -133,9 +133,9 @@ func getSearchResults(index int, projectNumbers chan<- string) error {
 // All three are connected with channels: “projectNumbers” between (1) and (2),
 // and “projects” between (2) and (3).
 func main() {
-	mongoClient, coll, err := mongo.InitializeMongo(context.TODO(), logger)
+	mongoClient, coll, err := mongo.InitializeMongo(context.Background(), logger)
 	check(err)
-	defer func() { err := mongoClient.Disconnect(context.TODO()); check(err) }()
+	defer func() { err := mongoClient.Disconnect(context.Background()); check(err) }()
 	var projectWorkersWaitGroup sync.WaitGroup
 	projectNumbers := make(chan string, 10*numberProjectWorkers)
 	projects := make(chan projecter)
@@ -159,7 +159,7 @@ func main() {
 		for project := range projects {
 			filter, update := project.updateMongo()
 			mongo.UpdateLastModificationTimestamp(update)
-			result, err := coll.UpdateOne(context.TODO(), filter, update, mongo.MongoOpts)
+			result, err := coll.UpdateOne(context.Background(), filter, update, mongo.MongoOpts)
 			check(err)
 			if result.UpsertedCount != 1 {
 				logger.Printf("ERROR: project was not written properly to MongoDB")
