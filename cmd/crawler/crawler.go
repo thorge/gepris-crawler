@@ -50,6 +50,10 @@ func setupLogging() *log.Logger {
 
 var logger = setupLogging()
 
+func init() {
+	mongo.Logger = logger
+}
+
 const (
 	numberSearchWorkers  = 4
 	numberProjectWorkers = 4
@@ -133,7 +137,7 @@ func getSearchResults(index int, projectNumbers chan<- string) error {
 // All three are connected with channels: “projectNumbers” between (1) and (2),
 // and “projects” between (2) and (3).
 func main() {
-	mongoClient, coll, err := mongo.InitializeMongo(context.Background(), logger)
+	mongoClient, coll, err := mongo.InitializeMongo(context.Background())
 	check(err)
 	defer func() { err := mongoClient.Disconnect(context.Background()); check(err) }()
 	var projectWorkersWaitGroup sync.WaitGroup

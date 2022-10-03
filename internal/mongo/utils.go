@@ -11,4 +11,4 @@ func check(e error) {
 	}
 }
 
-var logger *log.Logger
+var Logger *log.Logger

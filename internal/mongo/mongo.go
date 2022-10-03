@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,15 +19,14 @@ var indexModel = mongo.IndexModel{
 // InitializeMongo makes the connection to the MongoDB, creates the database
 // “gepris” with the collection “projects” and the index for the “number”
 // field.  Everything of this that already exists is left as is.
-func InitializeMongo(ctx context.Context, centralLogger *log.Logger) (*mongo.Client, *mongo.Collection, error) {
-	logger = centralLogger
+func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, error) {
 	if client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost")); err != nil {
 		return nil, nil, err
 	} else {
 		coll := client.Database("gepris").Collection("projects")
 		name, err := coll.Indexes().CreateOne(ctx, indexModel)
 		check(err)
-		logger.Printf("INFO: Created index %v", name)
+		Logger.Printf("INFO: Created index %v", name)
 		return client, coll, nil
 	}
 }
