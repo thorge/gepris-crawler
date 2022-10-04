@@ -32,7 +32,7 @@ type projectPerson struct {
 // an institution.
 type projectInstitution struct {
 	projectBase
-	institution      string
+	institutions     []string
 	coInstitutions   []string
 	partInstitutions []string
 	speakers         []string
@@ -74,7 +74,7 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D) {
 	filter, update := project.projectBase.updateMongo()
 	document := update[0].Value.(bson.M)
 	document["type"] = "institutional"
-	document["institution"] = project.institution
+	document["institutions"] = project.institutions
 	document["coInstitutions"] = project.coInstitutions
 	document["partInstitutions"] = project.partInstitutions
 	document["speakers"] = project.speakers
@@ -175,10 +175,10 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if err := project.projectBase.scanDocument(doc); err != nil {
 		return err
 	}
-	if results := parseLinkList(doc.Find(`span.name:contains("Antragstellende Institution")`).Next()); len(results) != 1 {
-		return fmt.Errorf("number of applying institutions was not 1 but %v", len(results))
+	if results := parseLinkList(doc.Find(`span.name:contains("Antragstellende Institution")`).Next()); len(results) == 0 {
+		return fmt.Errorf("no applying institution found")
 	} else {
-		project.institution = results[0]
+		project.institutions = results
 	}
 	project.coInstitutions = parseLinkList(doc.Find(`span.name:contains("Mitantragstellende Institution")`).Next())
 	if len(project.coInstitutions) != 0 {
