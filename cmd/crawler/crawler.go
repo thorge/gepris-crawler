@@ -166,7 +166,7 @@ func main() {
 			result, err := coll.UpdateOne(context.Background(), filter, update, mongo.MongoOpts)
 			check(err)
 			if result.UpsertedCount+result.ModifiedCount != 1 {
-				logger.Printf("ERROR: project was not written properly to MongoDB")
+				logger.Println("ERROR: project was not written properly to MongoDB")
 			}
 		}
 	}()
