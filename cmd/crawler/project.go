@@ -178,7 +178,7 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if len(project.partInstitutions) != 0 {
 		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
 	}
-	if results := parseLinkList(doc.Find(`span.name:contains("Sprecher"), span.name:contains("Sprecherin")` +
+	if results := parseLinkList(doc.Find(`span.name:contains("Sprecher"), span.name:contains("Sprecherin"), ` +
 		`span.name:contains("Leiter"), span.name:contains("Leiterin")`).Next()); len(results) != 1 {
 		return fmt.Errorf("number of speakers was not 1 but %v", len(results))
 	} else {
