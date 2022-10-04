@@ -190,7 +190,7 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	}
 	project.speakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next())
 	if len(project.speakers) == 0 {
-		logger.Printf("DEBUG: no speaker found")
+		logger.Printf("WARNING: no speaker found")
 	}
 	project.coSpeakers = parseLinkList(doc.Find(`span.name:contains("Co-Sprecherinnen / Co-Sprecher")`).Next())
 	if len(project.coSpeakers) != 0 {
