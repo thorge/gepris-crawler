@@ -192,9 +192,6 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if len(project.speakers) == 0 {
 		logger.Printf("DEBUG: no speaker found")
 	}
-	if len(project.coSpeakers) != 0 {
-		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
-	}
 	project.coSpeakers = parseLinkList(doc.Find(`span.name:contains("Co-Sprecherinnen / Co-Sprecher")`).Next())
 	if len(project.coSpeakers) != 0 {
 		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
