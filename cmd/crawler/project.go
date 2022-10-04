@@ -127,7 +127,7 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	}
 	project.disciplines = parseDisciplines(doc)
 	if len(project.disciplines) == 0 {
-		return fmt.Errorf("project has no discipline")
+		logger.Println("WARNING: project has no discipline")
 	}
 	project.startYear, project.endYear, err = parseTimespan(doc)
 	check(err)
