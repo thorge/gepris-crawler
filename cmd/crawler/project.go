@@ -35,7 +35,7 @@ type projectInstitution struct {
 	institution      string
 	coInstitutions   []string
 	partInstitutions []string
-	speaker          string
+	speaker          []string
 	coSpeakers       []string
 	partPeople       []string
 }
@@ -160,7 +160,7 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	return nil
 }
 
-var leiterRegexp = regexp.MustCompile(`^\s*(?:Teilprojektleiter|Sprecher|Leiter)(?:in)?\s*$`)
+var leiterRegexp = regexp.MustCompile(`^\s*(?:Teilprojektleiter|Sprecher|Leiter)(?:in(?:nen)?)?(?: / (?:Teilprojektleiter|Sprecher|Leiter))?\s*$`)
 
 func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
 	return func(_ int, s *goquery.Selection) bool {
@@ -187,10 +187,10 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if len(project.partInstitutions) != 0 {
 		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
 	}
-	if results := parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next()); len(results) != 1 {
-		return fmt.Errorf("number of speakers was not 1 but %v", len(results))
+	if results := parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next()); len(results) == 0 {
+		return fmt.Errorf("no speaker found")
 	} else {
-		project.speaker = results[0]
+		project.speaker = results
 	}
 	if len(project.coSpeakers) != 0 {
 		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
