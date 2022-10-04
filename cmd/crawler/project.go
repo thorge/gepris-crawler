@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/PuerkitoBio/goquery"
 	"go.mongodb.org/mongo-driver/bson"
@@ -159,6 +160,14 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	return nil
 }
 
+var leiterRegexp = regexp.MustCompile(`^\s*(?:Sprecher|Leiter)(?:in)?\s*$`)
+
+func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
+	return func(_ int, s *goquery.Selection) bool {
+		return re.MatchString(s.Text())
+	}
+}
+
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
 func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
@@ -178,8 +187,7 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if len(project.partInstitutions) != 0 {
 		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
 	}
-	if results := parseLinkList(doc.Find(`span.name:contains("Sprecher"), span.name:contains("Sprecherin"), ` +
-		`span.name:contains("Leiter"), span.name:contains("Leiterin")`).Next()); len(results) != 1 {
+	if results := parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next()); len(results) != 1 {
 		return fmt.Errorf("number of speakers was not 1 but %v", len(results))
 	} else {
 		project.speaker = results[0]
