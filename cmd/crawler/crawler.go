@@ -165,7 +165,7 @@ func main() {
 			mongo.UpdateLastModificationTimestamp(update)
 			result, err := coll.UpdateOne(context.Background(), filter, update, mongo.MongoOpts)
 			check(err)
-			if result.UpsertedCount != 1 {
+			if result.UpsertedCount+result.ModifiedCount != 1 {
 				logger.Printf("ERROR: project was not written properly to MongoDB")
 			}
 		}
