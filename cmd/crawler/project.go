@@ -24,7 +24,7 @@ type projectBase struct {
 // person.
 type projectPerson struct {
 	projectBase
-	applicant  []string
+	applicants []string
 	partPeople []string
 }
 
@@ -35,7 +35,7 @@ type projectInstitution struct {
 	institution      string
 	coInstitutions   []string
 	partInstitutions []string
-	speaker          []string
+	speakers         []string
 	coSpeakers       []string
 	partPeople       []string
 }
@@ -63,7 +63,7 @@ func (project projectPerson) updateMongo() (bson.D, bson.D) {
 	filter, update := project.projectBase.updateMongo()
 	document := update[0].Value.(bson.M)
 	document["type"] = "personal"
-	document["applicant"] = project.applicant
+	document["applicants"] = project.applicants
 	document["partPeople"] = project.partPeople
 	return filter, update
 }
@@ -77,7 +77,7 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D) {
 	document["institution"] = project.institution
 	document["coInstitutions"] = project.coInstitutions
 	document["partInstitutions"] = project.partInstitutions
-	document["speaker"] = project.speaker
+	document["speakers"] = project.speakers
 	document["coSpeakers"] = project.coSpeakers
 	document["partPeople"] = project.partPeople
 	return filter, update
@@ -151,7 +151,7 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 		Next()); len(results) == 0 {
 		return fmt.Errorf("no applicant found")
 	} else {
-		project.applicant = results
+		project.applicants = results
 	}
 	project.partPeople = parseLinkList(doc.Find(`span.name:contains("Beteiligte Personen")`).Next())
 	if len(project.partPeople) != 0 {
@@ -192,7 +192,7 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 		FilterFunction(filterByRegexp(leiterRegexp)).Next()); len(results) == 0 {
 		return fmt.Errorf("no speaker found")
 	} else {
-		project.speaker = results
+		project.speakers = results
 	}
 	if len(project.coSpeakers) != 0 {
 		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
