@@ -23,7 +23,7 @@ type projectBase struct {
 // person.
 type projectPerson struct {
 	projectBase
-	applicant  string
+	applicant  []string
 	partPeople []string
 }
 
@@ -147,10 +147,10 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 		return err
 	}
 	if results := parseLinkList(doc.Find(`span.name:contains("Antragsteller"), span.name:contains("Antragstellerin")`).
-		Next()); len(results) != 1 {
-		return fmt.Errorf("number of applicants was not 1 but %v", len(results))
+		Next()); len(results) == 0 {
+		return fmt.Errorf("no applicant found")
 	} else {
-		project.applicant = results[0]
+		project.applicant = results
 	}
 	project.partPeople = parseLinkList(doc.Find(`span.name:contains("Beteiligte Personen")`).Next())
 	if len(project.partPeople) != 0 {
