@@ -160,7 +160,7 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	return nil
 }
 
-var leiterRegexp = regexp.MustCompile(`^\s*(?:Sprecher|Leiter)(?:in)?\s*$`)
+var leiterRegexp = regexp.MustCompile(`^\s*(?:Teilprojektleiter|Sprecher|Leiter)(?:in)?\s*$`)
 
 func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
 	return func(_ int, s *goquery.Selection) bool {
