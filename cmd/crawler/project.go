@@ -92,7 +92,7 @@ type projecter interface {
 
 // parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.
 func parseDisciplines(doc *goquery.Document) (disciplines []string) {
-	doc.Find(`span.name:contains("Fachliche Zuordnung")`).Next().FilterFunction(func(i int, s *goquery.Selection) bool {
+	doc.Find(`span.name`).FilterFunction(filterByRegexp(disciplineRegexp)).Next().FilterFunction(func(i int, s *goquery.Selection) bool {
 		return s.Nodes[0].Type == 3
 	}).Each(func(i int, s *goquery.Selection) {
 		disciplines = append(disciplines, normalizeString(s.Text()))
@@ -120,7 +120,7 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	if project.title == "" {
 		return fmt.Errorf("project has no title")
 	}
-	project.process, err = getField(doc.Find(`span.name:contains("DFG-Verfahren")`).Next())
+	project.process, err = getField(doc.Find(`span.name`).FilterFunction(filterByRegexp(processRegexp)).Next())
 	check(err)
 	if project.process == "" {
 		return fmt.Errorf("project has no DFG process")
@@ -147,13 +147,13 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	if err := project.projectBase.scanDocument(doc); err != nil {
 		return err
 	}
-	if results := parseLinkList(doc.Find(`span.name:contains("Antragsteller"), span.name:contains("Antragstellerin")`).
+	if results := parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(applicantRegexp)).
 		Next()); len(results) == 0 {
 		return fmt.Errorf("no applicant found")
 	} else {
 		project.applicants = results
 	}
-	project.partPeople = parseLinkList(doc.Find(`span.name:contains("Beteiligte Personen")`).Next())
+	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
 		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
 	}
@@ -162,6 +162,15 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 
 var leiterRegexp = regexp.MustCompile(`^\s*(?:Teilprojektleiter|Sprecher|Leiter)(?:in(?:nen)?)?` +
 	`(?: / (?:Teilprojektleiter|Sprecher|Leiter))?\s*$`)
+var disciplineRegexp = regexp.MustCompile(`^\s*Fachliche Zuordnung\s*$`)
+var processRegexp = regexp.MustCompile(`^\s*DFG-Verfahren\s*$`)
+var applicantRegexp = regexp.MustCompile(`^\s*Antragsteller(?:in(?:nen)?)?(?: / Antragsteller)?\s*$`)
+var partPeopleRegexp = regexp.MustCompile(`^\s*Beteiligte Person(?:en)?\s*$`)
+var institutionsRegexp = regexp.MustCompile(`^\s*Antragstellende Institution\s*$`)
+var coInstitutionsRegexp = regexp.MustCompile(`^\s*Mitantragstellende Institution\s*$`)
+var partInstitutionsRegexp = regexp.MustCompile(`^\s*Beteiligte Einrichtung\s*$`)
+var coSpeakersRegexp = regexp.MustCompile(`^\s*Co-Sprecher(?:in(?:nen)?)?(?: / Co-Sprecher)?\s*$`)
+var fundingRegexp = regexp.MustCompile(`^\s*Förderung\s*$`)
 
 func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
 	return func(_ int, s *goquery.Selection) bool {
@@ -175,16 +184,19 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if err := project.projectBase.scanDocument(doc); err != nil {
 		return err
 	}
-	if results := parseLinkList(doc.Find(`span.name:contains("Antragstellende Institution")`).Next()); len(results) == 0 {
+	if results := parseLinkList(
+		doc.Find(`span.name`).FilterFunction(filterByRegexp(institutionsRegexp)).Next()); len(results) == 0 {
 		return fmt.Errorf("no applying institution found")
 	} else {
 		project.institutions = results
 	}
-	project.coInstitutions = parseLinkList(doc.Find(`span.name:contains("Mitantragstellende Institution")`).Next())
+	project.coInstitutions = parseLinkList(
+		doc.Find(`span.name`).FilterFunction(filterByRegexp(coInstitutionsRegexp)).Next())
 	if len(project.coInstitutions) != 0 {
 		logger.Printf("DEBUG: found %v co-applying institutions", len(project.coInstitutions))
 	}
-	project.partInstitutions = parseLinkList(doc.Find(`span.name:contains("Beteiligte Einrichtung")`).Next())
+	project.partInstitutions = parseLinkList(
+		doc.Find(`span.name`).FilterFunction(filterByRegexp(partInstitutionsRegexp)).Next())
 	if len(project.partInstitutions) != 0 {
 		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
 	}
@@ -192,11 +204,11 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if len(project.speakers) == 0 {
 		logger.Printf("WARNING: no speaker found")
 	}
-	project.coSpeakers = parseLinkList(doc.Find(`span.name:contains("Co-Sprecherinnen / Co-Sprecher")`).Next())
+	project.coSpeakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(coSpeakersRegexp)).Next())
 	if len(project.coSpeakers) != 0 {
 		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
 	}
-	project.partPeople = parseLinkList(doc.Find(`span.name:contains("Beteiligte Personen")`).Next())
+	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
 		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
 	}

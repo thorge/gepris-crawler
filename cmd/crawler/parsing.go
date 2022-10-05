@@ -63,7 +63,7 @@ func mustAtoi(s string) (i int) {
 // document of the project as input.  If any of start or end cannot be found in
 // the document, 0 is used as the value.
 func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
-	timespan, err := getField(doc.Find(`span.name:contains("Förderung")`).Next())
+	timespan, err := getField(doc.Find(`span.name`).FilterFunction(filterByRegexp(fundingRegexp)).Next())
 	if err != nil {
 		return start, end, err
 	}
