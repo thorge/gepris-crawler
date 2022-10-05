@@ -149,7 +149,8 @@ func main() {
 			defer projectWorkersWaitGroup.Done()
 			for projectNumber := range projectNumbers {
 				if project, err := processProject(projectNumber); err != nil {
-					logger.Printf("ERROR: While processing #%v: %v", projectNumber, err)
+					logger.Printf("ERROR: While processing <https://gepris.dfg.de/gepris/projekt/%v>: %v",
+						projectNumber, err)
 				} else {
 					projects <- project
 				}
