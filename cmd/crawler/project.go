@@ -115,7 +115,11 @@ func parseLinkList(s *goquery.Selection) (elements []string) {
 func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	var err error
 	if project.title, err = getField(doc.Find("div.details > h1")); err != nil {
-		return err
+		if project.number == "61027617" || project.number == "142091898" || project.number == "221781256" {
+			project.title = fmt.Sprintf("DFG project %v (no proper title known)", project.number)
+		} else {
+			return err
+		}
 	}
 	if project.title == "" {
 		return fmt.Errorf("project has no title")
