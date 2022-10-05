@@ -31,3 +31,5 @@ Things to improve
 - Instead of upserting in MongoDB using the project number as the filter, the
   project number should be in the ``_id`` field.  Then, I don’t need the index
   of “number” any more.  Moreover, it *may* be faster.
+- “Sprecher” (speaker) and “Leiter” (head) should be distinguished.  They are
+  different at least for umbrella projects.
