@@ -160,16 +160,16 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	return nil
 }
 
-var leiterRegexp = regexp.MustCompile(`^\s*(?:Teilprojektleiter|Sprecher|Leiter)(?:in(?:nen)?)?` +
-	`(?: / (?:Teilprojektleiter|Sprecher|Leiter))?\s*$`)
+var leiterRegexp = regexp.MustCompile(`^\s*(Teilprojektleiter|Sprecher|Leiter)(in(nen)?)?` +
+	`( / (Teilprojektleiter|Sprecher|Leiter))?\s*$`)
 var disciplineRegexp = regexp.MustCompile(`^\s*Fachliche Zuordnung\s*$`)
 var processRegexp = regexp.MustCompile(`^\s*DFG-Verfahren\s*$`)
-var applicantRegexp = regexp.MustCompile(`^\s*Antragsteller(?:in(?:nen)?)?(?: / Antragsteller)?\s*$`)
-var partPeopleRegexp = regexp.MustCompile(`^\s*Beteiligte Person(?:en)?\s*$`)
+var applicantRegexp = regexp.MustCompile(`^\s*Antragsteller(in(nen)?)?( / Antragsteller)?\s*$`)
+var partPeopleRegexp = regexp.MustCompile(`^\s*Beteiligte Person(en)?\s*$`)
 var institutionsRegexp = regexp.MustCompile(`^\s*Antragstellende Institution\s*$`)
 var coInstitutionsRegexp = regexp.MustCompile(`^\s*Mitantragstellende Institution\s*$`)
 var partInstitutionsRegexp = regexp.MustCompile(`^\s*Beteiligte Einrichtung\s*$`)
-var coSpeakersRegexp = regexp.MustCompile(`^\s*Co-Sprecher(?:in(?:nen)?)?(?: / Co-Sprecher)?\s*$`)
+var coSpeakersRegexp = regexp.MustCompile(`^\s*Co-Sprecher(in(nen)?)?( / Co-Sprecher)?\s*$`)
 var fundingRegexp = regexp.MustCompile(`^\s*Förderung\s*$`)
 
 func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
