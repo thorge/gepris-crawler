@@ -82,7 +82,7 @@ func processProject(projectNumber string) (result projecter, err error) {
 	}
 	doc, err := getDocument(body)
 	check(err)
-	if strings.Contains(body, "Antragstellende Institution") {
+	if doc.Find(`span.name:contains("Antragstellende Institution")`).Length() > 0 {
 		result = &projectInstitution{projectBase: projectBase{number: projectNumber}}
 	} else {
 		result = &projectPerson{projectBase: projectBase{number: projectNumber}}
