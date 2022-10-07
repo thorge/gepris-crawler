@@ -110,6 +110,8 @@ func parseLinkList(s *goquery.Selection) (elements []string) {
 	return
 }
 
+var urlRegexp = regexp.MustCompile(`^/gepris/projekt/(\d+)$`)
+
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
 func (project *projectBase) scanDocument(doc *goquery.Document) error {

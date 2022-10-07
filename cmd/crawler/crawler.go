@@ -17,9 +17,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 
+	"github.com/PuerkitoBio/goquery"
 	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/mongo"
 )
 
@@ -116,11 +116,30 @@ func getSearchResults(index int, projectNumbers chan<- string) error {
 		logger.Printf("INFO: Could take search results from cache")
 		body = string(bodyRaw)
 	}
-	if strings.Contains(body, `<p class="warning">Ihre Suche ergab leider keine Treffer.</p>`) {
-		return ErrNoFurtherResults
+	if doc, err := getDocument(body); err != nil {
+		return err
 	} else {
-		for _, matches := range searchResultRegexp.FindAllStringSubmatch(body, -1) {
-			projectNumbers <- matches[1]
+		if doc.Find(`p.warning:contains("Ihre Suche ergab leider keine Treffer")`).Length() != 0 {
+			return ErrNoFurtherResults
+		} else {
+			var err error
+			doc.Find("h2 > a").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+				if url, exists := s.Attr("href"); exists {
+					if match := urlRegexp.FindStringSubmatch(url); match == nil {
+						err = fmt.Errorf("invalid URL “%v” found on search page", url)
+						return false
+					} else {
+						projectNumbers <- match[1]
+					}
+				} else {
+					err = fmt.Errorf("h2 > a element on search page had no “href” attribute")
+					return false
+				}
+				return true
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
