@@ -18,6 +18,8 @@ type projectBase struct {
 	disciplines        []string
 	url                string
 	description        string
+	parent             string
+	parentTitle        string
 }
 
 // projectPerson contains the data of a project the applicant of which is a
@@ -53,6 +55,8 @@ func (project projectBase) updateMongo() (bson.D, bson.D) {
 		"disciplines": project.disciplines,
 		"url":         project.url,
 		"description": project.description,
+		"parent":      project.parent,
+		"parentTitle": project.parentTitle,
 	}}}
 	return filter, update
 }
@@ -112,6 +116,30 @@ func parseLinkList(s *goquery.Selection) (elements []string) {
 
 var urlRegexp = regexp.MustCompile(`^/gepris/projekt/(\d+)$`)
 
+func getParent(doc *goquery.Document) (string, error) {
+	fieldNode := doc.Find(`span.name`).FilterFunction(filterByRegexp(parentRegexp)).Next()
+	if fieldNode.Length() == 0 {
+		return "", nil
+	} else if fieldNode.Length() > 1 {
+		return "", fmt.Errorf("ambiguous “Teilprojekt zu” field")
+	}
+	linkNode := fieldNode.Find("a.intern")
+	if linkNode.Length() != 1 {
+		return "", fmt.Errorf("not exactly one link in “Teilprojekt zu” field")
+	}
+	var url string
+	if value, exists := linkNode.Attr("href"); !exists {
+		return "", fmt.Errorf("no URL to parent project found in “Teilprojekt zu”")
+	} else {
+		url = value
+	}
+	if match := urlRegexp.FindStringSubmatch(url); match == nil {
+		return "", fmt.Errorf("invalid URL found in “Teilprojekt zu”")
+	} else {
+		return match[1], nil
+	}
+}
+
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
 func (project *projectBase) scanDocument(doc *goquery.Document) error {
@@ -130,6 +158,14 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	check(err)
 	if project.process == "" {
 		return fmt.Errorf("project has no DFG process")
+	}
+	if parent, err := getParent(doc); err != nil {
+		return err
+	} else {
+		if parent != "" {
+			logger.Println("DEBUG: found parent project")
+			project.parent = parent
+		}
 	}
 	project.disciplines = parseDisciplines(doc)
 	if len(project.disciplines) == 0 {
@@ -170,6 +206,7 @@ var leiterRegexp = regexp.MustCompile(`^\s*(Teilprojektleiter|Sprecher|Leiter)(i
 	`( / (Teilprojektleiter|Sprecher|Leiter))?\s*$`)
 var disciplineRegexp = regexp.MustCompile(`^\s*Fachliche Zuordnung\s*$`)
 var processRegexp = regexp.MustCompile(`^\s*DFG-Verfahren\s*$`)
+var parentRegexp = regexp.MustCompile(`^\s*Teilprojekt zu\s*$`)
 var applicantRegexp = regexp.MustCompile(`^\s*Antragsteller(in(nen)?)?( / Antragsteller)?\s*$`)
 var partPeopleRegexp = regexp.MustCompile(`^\s*Beteiligte Person(en)?\s*$`)
 var institutionsRegexp = regexp.MustCompile(`^\s*Antragstellende Institution\s*$`)
