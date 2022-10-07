@@ -16,7 +16,8 @@ Things to discuss
 -----------------
 
 - Is 024__2 (link to this crawler) okay?
-- How do we deal with the mix of institutions and people in MARC field 371?
+- How do we deal with the mix of institutions and people in MARC field 371?  In
+  particular, may also be an institution in field 371?
 
 
 Things to improve
