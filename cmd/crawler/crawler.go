@@ -65,6 +65,8 @@ const (
 	resultsPerPage       = 50
 )
 
+var subProjectListRegex = regexp.MustCompile("^.*Projekte.*$")
+
 // processProject takes the DFG project number and returns a projecter object
 // already filled with all data.  The caller will then send this object to the
 // storage (MongoDB).  This function decides which concrete type will be used
@@ -84,7 +86,9 @@ func processProject(projectNumber string) (result projecter, err error) {
 	}
 	doc, err := getDocument(body)
 	check(err)
-	if doc.Find(`span.name:contains("Antragstellende Institution")`).Length() > 0 {
+	if doc.Find("h2.facelift").FilterFunction(filterByRegexp(subProjectListRegex)).Length() > 0 {
+		result = &projectUmbrella{projectBase: projectBase{number: projectNumber}}
+	} else if doc.Find(`span.name:contains("Antragstellende Institution")`).Length() > 0 {
 		result = &projectInstitution{projectBase: projectBase{number: projectNumber}}
 	} else {
 		result = &projectPerson{projectBase: projectBase{number: projectNumber}}

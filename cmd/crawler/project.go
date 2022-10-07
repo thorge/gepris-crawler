@@ -42,6 +42,16 @@ type projectInstitution struct {
 	partPeople       []string
 }
 
+type projectUmbrella struct {
+	projectBase
+	institutions     []string
+	coInstitutions   []string
+	partInstitutions []string
+	speakers         []string
+	coSpeakers       []string
+	partPeople       []string
+}
+
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
 func (project projectBase) updateMongo() (bson.D, bson.D) {
@@ -78,6 +88,21 @@ func (project projectInstitution) updateMongo() (bson.D, bson.D) {
 	filter, update := project.projectBase.updateMongo()
 	document := update[0].Value.(bson.M)
 	document["type"] = "institutional"
+	document["institutions"] = project.institutions
+	document["coInstitutions"] = project.coInstitutions
+	document["partInstitutions"] = project.partInstitutions
+	document["speakers"] = project.speakers
+	document["coSpeakers"] = project.coSpeakers
+	document["partPeople"] = project.partPeople
+	return filter, update
+}
+
+// updateMongo returns the “filter” and “update” parameters ready to be used
+// for “mongo.Collection.UpdateOne”.
+func (project projectUmbrella) updateMongo() (bson.D, bson.D) {
+	filter, update := project.projectBase.updateMongo()
+	document := update[0].Value.(bson.M)
+	document["type"] = "umbrella"
 	document["institutions"] = project.institutions
 	document["coInstitutions"] = project.coInstitutions
 	document["partInstitutions"] = project.partInstitutions
@@ -230,6 +255,43 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	if results := parseLinkList(
 		doc.Find(`span.name`).FilterFunction(filterByRegexp(institutionsRegexp)).Next()); len(results) == 0 {
 		return fmt.Errorf("no applying institution found")
+	} else {
+		project.institutions = results
+	}
+	project.coInstitutions = parseLinkList(
+		doc.Find(`span.name`).FilterFunction(filterByRegexp(coInstitutionsRegexp)).Next())
+	if len(project.coInstitutions) != 0 {
+		logger.Printf("DEBUG: found %v co-applying institutions", len(project.coInstitutions))
+	}
+	project.partInstitutions = parseLinkList(
+		doc.Find(`span.name`).FilterFunction(filterByRegexp(partInstitutionsRegexp)).Next())
+	if len(project.partInstitutions) != 0 {
+		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
+	}
+	project.speakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next())
+	if len(project.speakers) == 0 {
+		logger.Printf("WARNING: no speaker found")
+	}
+	project.coSpeakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(coSpeakersRegexp)).Next())
+	if len(project.coSpeakers) != 0 {
+		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
+	}
+	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
+	if len(project.partPeople) != 0 {
+		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
+	}
+	return nil
+}
+
+// scanDocument fills the internal data fields of the project with the data
+// found in the given HTML document.
+func (project *projectUmbrella) scanDocument(doc *goquery.Document) error {
+	if err := project.projectBase.scanDocument(doc); err != nil {
+		return err
+	}
+	if results := parseLinkList(
+		doc.Find(`span.name`).FilterFunction(filterByRegexp(institutionsRegexp)).Next()); len(results) == 0 {
+		logger.Println("DEBUG: no applying institution found")
 	} else {
 		project.institutions = results
 	}
