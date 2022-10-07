@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/PuerkitoBio/goquery"
+	mongodb "go.mongodb.org/mongo-driver/mongo"
 	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/mongo"
 )
 
@@ -156,9 +157,13 @@ func getSearchResults(index int, projectNumbers chan<- string) error {
 // All three are connected with channels: “projectNumbers” between (1) and (2),
 // and “projects” between (2) and (3).
 func main() {
-	mongoClient, coll, err := mongo.InitializeMongo(context.Background())
-	check(err)
-	defer func() { err := mongoClient.Disconnect(context.Background()); check(err) }()
+	var coll *mongodb.Collection
+	if mongoClient, coll_, err := mongo.InitializeMongo(context.Background()); err != nil {
+		check(err)
+	} else {
+		defer func() { err := mongoClient.Disconnect(context.Background()); check(err) }()
+		coll = coll_
+	}
 	var projectWorkersWaitGroup sync.WaitGroup
 	projectNumbers := make(chan string, 10*numberProjectWorkers)
 	projects := make(chan projecter)
