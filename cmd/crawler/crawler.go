@@ -57,8 +57,8 @@ func init() {
 const (
 	numberSearchWorkers  = 4
 	numberProjectWorkers = 4
-	triesLeft            = 3
-	maxWaitMillisec      = 5000
+	triesLeft            = 10
+	maxWaitMillisec      = 10000
 	maxRequestsPerSec    = 50
 	resultsPerPage       = 50
 )
