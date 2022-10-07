@@ -17,7 +17,6 @@ Missing output MARC fields
 --------------------------
 
 - MARC field 450 (abbreviation)
-- MARC field 550 (link to parent)
 
 
 Things to discuss
