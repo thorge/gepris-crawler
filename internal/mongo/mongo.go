@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var MongoOpts = options.Update().SetUpsert(true)
+var MongoOpts = options.Replace().SetUpsert(true)
 
 var indexModel = mongo.IndexModel{
 	Keys: bson.D{{"number", 1}},
@@ -31,6 +31,6 @@ func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, err
 	}
 }
 
-func UpdateLastModificationTimestamp(update bson.D) {
-	update[0].Value.(bson.M)["lastModification"] = primitive.NewDateTimeFromTime(time.Now())
+func UpdateLastModificationTimestamp(update bson.M) {
+	update["lastModification"] = primitive.NewDateTimeFromTime(time.Now())
 }

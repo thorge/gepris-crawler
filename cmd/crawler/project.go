@@ -55,9 +55,9 @@ type projectUmbrella struct {
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectBase) updateMongo() (bson.D, bson.D) {
+func (project projectBase) updateMongo() (bson.D, bson.M) {
 	filter := bson.D{{"number", project.number}}
-	update := bson.D{{"$set", bson.M{
+	update := bson.M{
 		"number":      project.number,
 		"title":       project.title,
 		"process":     project.process,
@@ -68,48 +68,45 @@ func (project projectBase) updateMongo() (bson.D, bson.D) {
 		"description": project.description,
 		"parent":      project.parent,
 		"parentTitle": project.parentTitle,
-	}}}
+	}
 	return filter, update
 }
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectPerson) updateMongo() (bson.D, bson.D) {
+func (project projectPerson) updateMongo() (bson.D, bson.M) {
 	filter, update := project.projectBase.updateMongo()
-	document := update[0].Value.(bson.M)
-	document["type"] = "personal"
-	document["applicants"] = project.applicants
-	document["partPeople"] = project.partPeople
+	update["type"] = "personal"
+	update["applicants"] = project.applicants
+	update["partPeople"] = project.partPeople
 	return filter, update
 }
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectInstitution) updateMongo() (bson.D, bson.D) {
+func (project projectInstitution) updateMongo() (bson.D, bson.M) {
 	filter, update := project.projectBase.updateMongo()
-	document := update[0].Value.(bson.M)
-	document["type"] = "institutional"
-	document["institutions"] = project.institutions
-	document["coInstitutions"] = project.coInstitutions
-	document["partInstitutions"] = project.partInstitutions
-	document["speakers"] = project.speakers
-	document["coSpeakers"] = project.coSpeakers
-	document["partPeople"] = project.partPeople
+	update["type"] = "institutional"
+	update["institutions"] = project.institutions
+	update["coInstitutions"] = project.coInstitutions
+	update["partInstitutions"] = project.partInstitutions
+	update["speakers"] = project.speakers
+	update["coSpeakers"] = project.coSpeakers
+	update["partPeople"] = project.partPeople
 	return filter, update
 }
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectUmbrella) updateMongo() (bson.D, bson.D) {
+func (project projectUmbrella) updateMongo() (bson.D, bson.M) {
 	filter, update := project.projectBase.updateMongo()
-	document := update[0].Value.(bson.M)
-	document["type"] = "umbrella"
-	document["institutions"] = project.institutions
-	document["coInstitutions"] = project.coInstitutions
-	document["partInstitutions"] = project.partInstitutions
-	document["speakers"] = project.speakers
-	document["coSpeakers"] = project.coSpeakers
-	document["partPeople"] = project.partPeople
+	update["type"] = "umbrella"
+	update["institutions"] = project.institutions
+	update["coInstitutions"] = project.coInstitutions
+	update["partInstitutions"] = project.partInstitutions
+	update["speakers"] = project.speakers
+	update["coSpeakers"] = project.coSpeakers
+	update["partPeople"] = project.partPeople
 	return filter, update
 }
 
@@ -117,7 +114,7 @@ func (project projectUmbrella) updateMongo() (bson.D, bson.D) {
 // page and fill their internal data structure with it.  Then, they
 type projecter interface {
 	scanDocument(doc *goquery.Document) error
-	updateMongo() (bson.D, bson.D)
+	updateMongo() (bson.D, bson.M)
 }
 
 // parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.

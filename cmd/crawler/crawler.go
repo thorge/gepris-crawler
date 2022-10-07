@@ -200,7 +200,7 @@ func main() {
 		for project := range projects {
 			filter, update := project.updateMongo()
 			mongo.UpdateLastModificationTimestamp(update)
-			result, err := coll.UpdateOne(context.Background(), filter, update, mongo.MongoOpts)
+			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
 			check(err)
 			if result.UpsertedCount+result.ModifiedCount != 1 {
 				logger.Println("ERROR: project was not written properly to MongoDB")
