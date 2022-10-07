@@ -32,5 +32,5 @@ func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, err
 }
 
 func UpdateLastModificationTimestamp(update bson.D) {
-	update[0].Value.(bson.M)["lastModification"] = primitive.Timestamp{T: uint32(time.Now().Unix())}
+	update[0].Value.(bson.M)["lastModification"] = primitive.NewDateTimeFromTime(time.Now())
 }
