@@ -235,7 +235,7 @@ func main() {
 			if document.Parent == "" {
 				continue
 			}
-			// titles[document.Number] = document.Title
+			titles[document.Number] = document.Title
 			var title string
 			if foundTitle, ok := titles[document.Parent]; !ok {
 				result := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}})
