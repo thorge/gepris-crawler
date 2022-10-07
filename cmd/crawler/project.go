@@ -6,6 +6,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"go.mongodb.org/mongo-driver/bson"
+	"golang.org/x/exp/slices"
 )
 
 // projectBase contains the data included in every DFG project.  This is an
@@ -216,7 +217,13 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	}
 	if results := parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(applicantRegexp)).
 		Next()); len(results) == 0 {
-		return fmt.Errorf("no applicant found")
+		whitelist := []string{"5336466", "5382838", "5395416", "5449328", "5449334", "5449348", "29528568",
+			"463409137", "495365311"}
+		if slices.Contains(whitelist, project.number) {
+			logger.Printf("DEBUG: ignoring missing applicant for white-listed project")
+		} else {
+			return fmt.Errorf("no applicant found")
+		}
 	} else {
 		project.applicants = results
 	}
