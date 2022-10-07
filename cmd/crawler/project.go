@@ -55,8 +55,8 @@ type projectUmbrella struct {
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectBase) updateMongo() (bson.D, bson.M) {
-	filter := bson.D{{"number", project.number}}
+func (project projectBase) updateMongo() (bson.M, bson.M) {
+	filter := bson.M{"number": project.number}
 	update := bson.M{
 		"number":      project.number,
 		"title":       project.title,
@@ -74,7 +74,7 @@ func (project projectBase) updateMongo() (bson.D, bson.M) {
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectPerson) updateMongo() (bson.D, bson.M) {
+func (project projectPerson) updateMongo() (bson.M, bson.M) {
 	filter, update := project.projectBase.updateMongo()
 	update["type"] = "personal"
 	update["applicants"] = project.applicants
@@ -84,7 +84,7 @@ func (project projectPerson) updateMongo() (bson.D, bson.M) {
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectInstitution) updateMongo() (bson.D, bson.M) {
+func (project projectInstitution) updateMongo() (bson.M, bson.M) {
 	filter, update := project.projectBase.updateMongo()
 	update["type"] = "institutional"
 	update["institutions"] = project.institutions
@@ -98,7 +98,7 @@ func (project projectInstitution) updateMongo() (bson.D, bson.M) {
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
-func (project projectUmbrella) updateMongo() (bson.D, bson.M) {
+func (project projectUmbrella) updateMongo() (bson.M, bson.M) {
 	filter, update := project.projectBase.updateMongo()
 	update["type"] = "umbrella"
 	update["institutions"] = project.institutions
@@ -114,7 +114,7 @@ func (project projectUmbrella) updateMongo() (bson.D, bson.M) {
 // page and fill their internal data structure with it.  Then, they
 type projecter interface {
 	scanDocument(doc *goquery.Document) error
-	updateMongo() (bson.D, bson.M)
+	updateMongo() (bson.M, bson.M)
 }
 
 // parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.
