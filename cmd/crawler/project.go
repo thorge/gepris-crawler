@@ -119,9 +119,10 @@ type projecter interface {
 
 // parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.
 func parseDisciplines(doc *goquery.Document) (disciplines []string) {
-	doc.Find(`span.name`).FilterFunction(filterByRegexp(disciplineRegexp)).Next().FilterFunction(func(i int, s *goquery.Selection) bool {
-		return s.Nodes[0].Type == 3
-	}).Each(func(i int, s *goquery.Selection) {
+	doc.Find(`span.name`).FilterFunction(filterByRegexp(disciplineRegexp)).Next().
+		FilterFunction(func(i int, s *goquery.Selection) bool {
+			return s.Nodes[0].Type == 3
+		}).Each(func(i int, s *goquery.Selection) {
 		disciplines = append(disciplines, normalizeString(s.Text()))
 	})
 	return
