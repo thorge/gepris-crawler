@@ -204,7 +204,11 @@ func main() {
 				logger.Panic(err)
 			}
 			if oldProject == nil || project.isDifferent(oldProject) {
-				logger.Println("DEBUG: project is new or changed")
+				if oldProject == nil {
+					logger.Println("DEBUG: project is new")
+				} else {
+					logger.Println("DEBUG: project has changed")
+				}
 				filter, update := project.updateMongo()
 				mongo.UpdateLastModificationTimestamp(update)
 				result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
