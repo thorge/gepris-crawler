@@ -198,12 +198,22 @@ func main() {
 	go func() {
 		defer projectStorageWaitGroup.Done()
 		for project := range projects {
-			filter, update := project.updateMongo()
-			mongo.UpdateLastModificationTimestamp(update)
-			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
-			check(err)
-			if result.UpsertedCount+result.ModifiedCount != 1 {
-				logger.Println("ERROR: project was not written properly to MongoDB")
+			var oldProject map[string]any
+			if err := coll.FindOne(context.Background(), bson.M{"number": project.getNumber()}).
+				Decode(&oldProject); err != nil && !errors.Is(err, mongodb.ErrNoDocuments) {
+				logger.Panic(err)
+			}
+			if oldProject == nil || project.isDifferent(oldProject) {
+				logger.Println("DEBUG: project is new or changed")
+				filter, update := project.updateMongo()
+				mongo.UpdateLastModificationTimestamp(update)
+				result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
+				check(err)
+				if result.UpsertedCount+result.ModifiedCount != 1 {
+					logger.Println("ERROR: project was not written properly to MongoDB")
+				}
+			} else {
+				logger.Println("DEBUG: project is unchanged")
 			}
 		}
 	}()

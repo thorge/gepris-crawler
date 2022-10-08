@@ -72,6 +72,40 @@ func (project projectBase) updateMongo() (bson.M, bson.M) {
 	return filter, update
 }
 
+func (project projectBase) getNumber() string {
+	return project.number
+}
+
+func equal(a []string, b any) bool {
+	if b == nil {
+		return len(a) == 0
+	}
+	bAsArray := b.(bson.A)
+	if len(a) != len(bAsArray) {
+		return false
+	}
+	for i, v := range a {
+		if v != bAsArray[i].(string) {
+			return false
+		}
+	}
+	return true
+}
+
+func (project projectBase) isDifferent(oldProject map[string]any) bool {
+	if project.number != oldProject["number"].(string) {
+		logger.Panic("comparison with other project does not make sense")
+	}
+	return project.title != oldProject["title"].(string) ||
+		project.process != oldProject["process"].(string) ||
+		project.startYear != int(oldProject["startYear"].(int32)) ||
+		project.endYear != int(oldProject["endYear"].(int32)) ||
+		!equal(project.disciplines, oldProject["disciplines"]) ||
+		project.url != oldProject["url"].(string) ||
+		project.description != oldProject["description"].(string) ||
+		project.parent != oldProject["parent"].(string)
+}
+
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
 func (project projectPerson) updateMongo() (bson.M, bson.M) {
@@ -80,6 +114,13 @@ func (project projectPerson) updateMongo() (bson.M, bson.M) {
 	update["applicants"] = project.applicants
 	update["partPeople"] = project.partPeople
 	return filter, update
+}
+
+func (project projectPerson) isDifferent(oldProject map[string]any) bool {
+	return project.projectBase.isDifferent(oldProject) ||
+		oldProject["type"].(string) != "personal" ||
+		!equal(project.applicants, oldProject["applicants"]) ||
+		!equal(project.partPeople, oldProject["partPeople"])
 }
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
@@ -96,6 +137,17 @@ func (project projectInstitution) updateMongo() (bson.M, bson.M) {
 	return filter, update
 }
 
+func (project projectInstitution) isDifferent(oldProject map[string]any) bool {
+	return project.projectBase.isDifferent(oldProject) ||
+		oldProject["type"].(string) != "institutional" ||
+		!equal(project.institutions, oldProject["institutions"]) ||
+		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
+		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
+		!equal(project.speakers, oldProject["speakers"]) ||
+		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
+		!equal(project.partPeople, oldProject["partPeople"])
+}
+
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
 func (project projectUmbrella) updateMongo() (bson.M, bson.M) {
@@ -110,11 +162,24 @@ func (project projectUmbrella) updateMongo() (bson.M, bson.M) {
 	return filter, update
 }
 
+func (project projectUmbrella) isDifferent(oldProject map[string]any) bool {
+	return project.projectBase.isDifferent(oldProject) ||
+		oldProject["type"].(string) != "umbrella" ||
+		!equal(project.institutions, oldProject["institutions"]) ||
+		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
+		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
+		!equal(project.speakers, oldProject["speakers"]) ||
+		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
+		!equal(project.partPeople, oldProject["partPeople"])
+}
+
 // Types of the projecter interface are able to take data from a project HTML
 // page and fill their internal data structure with it.  Then, they
 type projecter interface {
 	scanDocument(doc *goquery.Document) error
 	updateMongo() (bson.M, bson.M)
+	getNumber() string
+	isDifferent(oldProject map[string]any) bool
 }
 
 // parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.
