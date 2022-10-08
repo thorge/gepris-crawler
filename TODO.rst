@@ -41,3 +41,10 @@ Things to improve
   of “number” any more.  Moreover, it *may* be faster.
 - “Sprecher” (speaker) and “Leiter” (head) should be distinguished.  They are
   different at least for umbrella projects.
+- According to
+  <https://betterprogramming.pub/how-to-use-golang-structs-with-mongodb-f1772e4a1da3#4cf5>,
+  one can use Go structs for MongoDB’s inserting, updating an replacing.  One
+  just has got to tag the fields in the type declarations.  I should use that
+  instead of the manual mapping to a bson data structure, which is error prone.
+  I have to check, however, whether this leads to wrong upper/lowercase in the
+  MongoDB document.
