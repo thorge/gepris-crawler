@@ -54,3 +54,5 @@ Things to improve
   metadata, repositories should use an element in metadata records to establish
   a linkage between the record (and the identifier of its item) and the
   identifier (URL, URN, DOI, etc.) of the associated resource.”
+- An <about> tag in the XML output may be interesting for both denoting the
+  origin of the data and the legal status of it.
