@@ -252,9 +252,9 @@ func main() {
 			titles[document.Number] = document.Title
 			var title string
 			if foundTitle, ok := titles[document.Parent]; !ok {
-				result := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}})
 				var parentDocument grantDocument
-				if err := result.Decode(&parentDocument); err != nil {
+				if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
+					Decode(&parentDocument); err != nil {
 					logger.Printf("ERROR: MongoDB result invalid for %v: %v", document.Parent, err)
 				} else {
 					title = parentDocument.Title
