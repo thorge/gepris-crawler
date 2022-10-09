@@ -239,7 +239,7 @@ func main() {
 	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
 		logger.Panic("could not access MongoDB")
 	} else {
-		defer func() { err = cursor.Close(context.Background()) }()
+		defer func() { err := cursor.Close(context.Background()); check(err) }()
 		titles := make(map[string]string)
 		for cursor.Next(context.Background()) {
 			var document grantDocument
