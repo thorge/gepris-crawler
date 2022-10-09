@@ -48,3 +48,9 @@ Things to improve
   instead of the manual mapping to a bson data structure, which is error prone.
   I have to check, however, whether this leads to wrong upper/lowercase in the
   MongoDB document.
+- The returned records should contain the URL on GEPRIS of the respective
+  project.  This way, we can satisfy the following recommendation of the PMH
+  spec: “To facilitate access to the resource associated with harvested
+  metadata, repositories should use an element in metadata records to establish
+  a linkage between the record (and the identifier of its item) and the
+  identifier (URL, URN, DOI, etc.) of the associated resource.”
