@@ -27,6 +27,8 @@ Things to discuss
   correct, or must it be wrapped in another root element?
 - Currently, in the MARC field 450 (abbreviated title) only the DFG project
   number is returned.  There is certainly room for improvement, but how?
+- How do we deal with datasets already present in the harvester?  Typically,
+  they have been manually enriched, and it would be a pity to lose that data.
 
 
 Things to improve
