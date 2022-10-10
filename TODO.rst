@@ -25,6 +25,12 @@ Things to discuss
 - Is 024__2 (link to this crawler) okay?
 - How do we deal with the mix of institutions and people in MARC field 371?  In
   particular, may also be an institution in field 371?
+- Is the out-most element “collection” in the MARCXML output correct?  The
+  Dublin Code output in the PMH spec contains an out-most element that is *not*
+  part of Dublin Core but of OAI.  In *contains* Dublin Core elements.
+  However, in MARCXML, the out-most element “collection” serves both: It is
+  MARCXML proper but also the OAI-PMH “container” of the MARC data.  Is this
+  correct, or must it be wrapped in another root element?
 
 
 Things to improve
