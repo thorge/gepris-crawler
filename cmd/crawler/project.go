@@ -14,6 +14,7 @@ import (
 type projectBase struct {
 	number             string
 	title              string
+	shortTitle         string
 	process            string
 	startYear, endYear int
 	disciplines        []string
@@ -60,6 +61,7 @@ func (project projectBase) updateMongo() (bson.M, bson.M) {
 	update := bson.M{
 		"number":      project.number,
 		"title":       project.title,
+		"shortTitle":  project.shortTitle,
 		"process":     project.process,
 		"startYear":   project.startYear,
 		"endYear":     project.endYear,
@@ -97,6 +99,7 @@ func (project projectBase) isDifferent(oldProject map[string]any) bool {
 		logger.Panic("comparison with other project does not make sense")
 	}
 	return project.title != oldProject["title"].(string) ||
+		project.shortTitle != oldProject["shortTitle"].(string) ||
 		project.process != oldProject["process"].(string) ||
 		project.startYear != int(oldProject["startYear"].(int32)) ||
 		project.endYear != int(oldProject["endYear"].(int32)) ||
@@ -243,6 +246,7 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	if project.title == "" {
 		return fmt.Errorf("project has no title")
 	}
+	project.shortTitle = fmt.Sprintf("DFG-Projekt %v", project.number)
 	project.process, err = getField(doc.Find(`span.name`).FilterFunction(filterByRegexp(processRegexp)).Next())
 	check(err)
 	if project.process == "" {
