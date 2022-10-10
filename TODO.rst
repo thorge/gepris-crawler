@@ -13,12 +13,6 @@ A good template for a DFG grant as MARCXML is
   existing function.
 
 
-Missing output MARC fields
---------------------------
-
-- MARC field 450 (abbreviation)
-
-
 Things to discuss
 -----------------
 
@@ -31,6 +25,8 @@ Things to discuss
   However, in MARCXML, the out-most element “collection” serves both: It is
   MARCXML proper but also the OAI-PMH “container” of the MARC data.  Is this
   correct, or must it be wrapped in another root element?
+- Currently, in the MARC field 450 (abbreviated title) only the DFG project
+  number is returned.  There is certainly room for improvement, but how?
 
 
 Things to improve
