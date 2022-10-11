@@ -306,6 +306,8 @@ func main() {
 	projectStorageWaitGroup.Add(1)
 	go storeProjects(projects, coll, &projectStorageWaitGroup)
 
+	ctxTicker, cancelTicker := context.WithCancel(context.Background())
+	go enableTicker(ctxTicker)
 	for _, year := range years {
 		index := 0
 		for {
@@ -321,6 +323,7 @@ func main() {
 
 	close(projectNumbers)
 	projectWorkersWaitGroup.Wait()
+	cancelTicker()
 	close(projects)
 	projectStorageWaitGroup.Wait()
 

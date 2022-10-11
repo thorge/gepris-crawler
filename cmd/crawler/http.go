@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -51,6 +52,18 @@ func fetchPage(url string) (string, error) {
 	return body, nil
 }
 
+func enableTicker(ctx context.Context) {
+	for t := range time.Tick(time.Second / maxRequestsPerSec) {
+		select {
+		case <-ctx.Done():
+			return
+		case ticker <- t:
+		default:
+			logger.Println("DEBUG: Workers slower than rate limiter")
+		}
+	}
+}
+
 func init() {
 	var transport = &http.Transport{
 		// Dial is the original function, plus a line in the log.  This way,
@@ -64,13 +77,4 @@ func init() {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	check(err)
 	client = http.Client{Transport: transport, Jar: jar}
-	go func() {
-		for t := range time.Tick(time.Second / maxRequestsPerSec) {
-			select {
-			case ticker <- t:
-			default:
-				logger.Println("DEBUG: Workers slower than rate limiter")
-			}
-		}
-	}()
 }
