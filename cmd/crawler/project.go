@@ -96,7 +96,7 @@ func equal(a []string, b any) bool {
 
 func (project projectBase) isDifferent(oldProject map[string]any) bool {
 	if project.number != oldProject["number"].(string) {
-		logger.Panic("comparison with other project does not make sense")
+		logger.Panic("comparison with project with different project number does not make sense")
 	}
 	return project.title != oldProject["title"].(string) ||
 		project.shortTitle != oldProject["shortTitle"].(string) ||
