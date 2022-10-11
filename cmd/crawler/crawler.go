@@ -52,16 +52,9 @@ func setupLogging() *log.Logger {
 }
 
 var logger = setupLogging()
-var years []int
 
 func init() {
 	mongo.Logger = logger
-	if os.Getenv("CRAWLER_FULL") == "1" {
-		years = []int{0}
-	} else {
-		year := time.Now().Year()
-		years = []int{year - 1, year}
-	}
 }
 
 const (
@@ -167,6 +160,15 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 		}
 	}
 	return nil
+}
+
+func getYears() []int {
+	if os.Getenv("CRAWLER_FULL") == "1" {
+		return []int{0}
+	} else {
+		currentYear := time.Now().Year()
+		return []int{currentYear - 1, currentYear}
+	}
 }
 
 type grantDocument struct {
@@ -309,7 +311,7 @@ func main() {
 
 	ctxTicker, cancelTicker := context.WithCancel(context.Background())
 	go enableTicker(ctxTicker)
-	for _, year := range years {
+	for _, year := range getYears() {
 		index := 0
 		for {
 			err := getSearchResults(year, index, projectNumbers)
