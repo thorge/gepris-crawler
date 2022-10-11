@@ -284,11 +284,12 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 // and “projects” between (2) and (3).
 func main() {
 	var coll *mongodb.Collection
-	if mongoClient, coll_, err := mongo.InitializeMongo(context.Background()); err != nil {
+	{
+		var mongoClient *mongodb.Client
+		var err error
+		mongoClient, coll, err = mongo.InitializeMongo(context.Background())
 		check(err)
-	} else {
 		defer func() { err := mongoClient.Disconnect(context.Background()); check(err) }()
-		coll = coll_
 	}
 
 	var projectWorkersWaitGroup sync.WaitGroup
