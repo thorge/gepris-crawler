@@ -50,3 +50,7 @@ CRAWLER_DEBUG
   current working directory.  It expects these directories to exist.  Whenever
   it finds a page there, it will not fetch it through HTTP.  This way, one can
   extensively test the crawler without hitting the GEPRIS.
+
+CRAWLER_FULL
+  By default, only the current calender year and the year before are crawled.
+  By setting CRAWLER_FULL to “1”, the whole GEPRIS is downloaded.

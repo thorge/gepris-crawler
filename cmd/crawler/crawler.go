@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"go.mongodb.org/mongo-driver/bson"
@@ -51,9 +52,16 @@ func setupLogging() *log.Logger {
 }
 
 var logger = setupLogging()
+var years []int
 
 func init() {
 	mongo.Logger = logger
+	if os.Getenv("CRAWLER_FULL") == "1" {
+		years = []int{0}
+	} else {
+		year := time.Now().Year()
+		years = []int{year - 1, year}
+	}
 }
 
 const (
@@ -110,12 +118,17 @@ var searchResultRegexp = regexp.MustCompile(`<a class="intern" href="/gepris/pro
 // entries, scans for the project numbers and sends them to the channel
 // projectNumbers.  The given index is the starting index in the search
 // results.  Thus, the caller should start with 0 and increment it by
-// resultsPerPage in subsequent calls.  The return value may be
-// ErrNoFurtherResults, which means that the index was larger than the number
-// of search results.
-func getSearchResults(index int, projectNumbers chan<- string) error {
+// resultsPerPage in subsequent calls.  The given year finds all projects
+// funded in that year.  Pass 0 if you want to have all projects.  The return
+// value may be ErrNoFurtherResults, which means that the index was larger than
+// the number of search results.
+func getSearchResults(year int, index int, projectNumbers chan<- string) error {
+	var fundedIn string
+	if year != 0 {
+		fundedIn = fmt.Sprintf("gefoerdertIn=%v&", year)
+	}
 	url := fmt.Sprintf("https://gepris.dfg.de/gepris/OCTOPUS?context=projekt&findButton=historyCall&"+
-		"hitsPerPage=%v&index=%v&task=doKatalog", resultsPerPage, index)
+		fundedIn+"hitsPerPage=%v&index=%v&task=doKatalog", resultsPerPage, index)
 	var body string
 	filename := fmt.Sprintf("search-results/%v_50.html", index)
 	if bodyRaw, err := os.ReadFile(filename); err != nil {
@@ -185,16 +198,26 @@ func main() {
 	var projectWorkersWaitGroup sync.WaitGroup
 	projectNumbers := make(chan string, 10*numberProjectWorkers)
 	projects := make(chan projecter)
+	allProjectNumbers := make(map[string]bool)
+	var allProjectNumbersMutex sync.RWMutex
 	for i := 0; i < numberProjectWorkers; i++ {
 		projectWorkersWaitGroup.Add(1)
 		go func() {
 			defer projectWorkersWaitGroup.Done()
 			for projectNumber := range projectNumbers {
-				if project, err := processProject(projectNumber); err != nil {
-					logger.Printf("ERROR: While processing <https://gepris.dfg.de/gepris/projekt/%v>: %v",
-						projectNumber, err)
-				} else {
-					projects <- project
+				allProjectNumbersMutex.Lock()
+				alreadyProcessed := allProjectNumbers[projectNumber]
+				if !alreadyProcessed {
+					allProjectNumbers[projectNumber] = true
+				}
+				allProjectNumbersMutex.Unlock()
+				if !alreadyProcessed {
+					if project, err := processProject(projectNumber); err != nil {
+						logger.Printf("ERROR: While processing "+
+							"<https://gepris.dfg.de/gepris/projekt/%v>: %v", projectNumber, err)
+					} else {
+						projects <- project
+					}
 				}
 			}
 		}()
@@ -227,15 +250,17 @@ func main() {
 			}
 		}
 	}()
-	index := 0
-	for {
-		err := getSearchResults(index, projectNumbers)
-		if errors.Is(err, ErrNoFurtherResults) {
-			break
-		} else if err != nil {
-			logger.Println("ERROR:", err)
+	for _, year := range years {
+		index := 0
+		for {
+			err := getSearchResults(year, index, projectNumbers)
+			if errors.Is(err, ErrNoFurtherResults) {
+				break
+			} else if err != nil {
+				logger.Println("ERROR:", err)
+			}
+			index += resultsPerPage
 		}
-		index += resultsPerPage
 	}
 	close(projectNumbers)
 	projectWorkersWaitGroup.Wait()
