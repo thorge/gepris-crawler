@@ -43,3 +43,10 @@ MONGODB_HOST
   URI to the MongoDB instance.  The GEPRIS crawler – this includes the PMH
   server – creates a database called “gepris“ in MongoDB.  MONGODB_HOST
   defaults to “mongodb://localhost”.
+
+CRAWLER_DEBUG
+  If set to “1”, the crawler will cache the fetched HTML pages in the
+  directories “``search-results``” and “``project-pages``”, relative to the
+  current working directory.  It expects these directories to exist.  Whenever
+  it finds a page there, it will not fetch it through HTTP.  This way, one can
+  extensively test the crawler without hitting the GEPRIS.

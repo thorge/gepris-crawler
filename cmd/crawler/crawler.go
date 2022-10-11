@@ -66,6 +66,7 @@ const (
 )
 
 var subProjectListRegex = regexp.MustCompile("^.*Projekte.*$")
+var cachePages = os.Getenv("CRAWLER_DEBUG") == "1"
 
 // processProject takes the DFG project number and returns a projecter object
 // already filled with all data.  The caller will then send this object to the
@@ -74,15 +75,20 @@ var subProjectListRegex = regexp.MustCompile("^.*Projekte.*$")
 func processProject(projectNumber string) (result projecter, err error) {
 	url := fmt.Sprintf("https://gepris.dfg.de/gepris/projekt/%v", projectNumber)
 	var body string
-	if bodyRaw, err := os.ReadFile(fmt.Sprintf("project-pages/%v.html", projectNumber)); err != nil {
+	if cachePages {
+		if bodyRaw, err := os.ReadFile(fmt.Sprintf("project-pages/%v.html", projectNumber)); err == nil {
+			logger.Printf("INFO: Could take page from cache")
+			body = string(bodyRaw)
+		}
+	}
+	if body == "" {
 		if body, err = fetchPage(url); err != nil {
 			return nil, err
 		}
-		err = os.WriteFile(fmt.Sprintf("project-pages/%v.html", projectNumber), []byte(body), 0666)
-		check(err)
-	} else {
-		logger.Printf("INFO: Could take page from cache")
-		body = string(bodyRaw)
+		if cachePages {
+			err = os.WriteFile(fmt.Sprintf("project-pages/%v.html", projectNumber), []byte(body), 0666)
+			check(err)
+		}
 	}
 	doc, err := getDocument(body)
 	check(err)
