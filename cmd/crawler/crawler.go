@@ -224,6 +224,54 @@ func updateParentTitles(coll *mongodb.Collection) {
 	logger.Println("INFO: finished updating all parent project titles")
 }
 
+func processProjectNumbers(projectNumbers <-chan string, projects chan<- projecter, wg *sync.WaitGroup,
+	allProjectNumbers map[string]bool, m *sync.RWMutex) {
+	defer wg.Done()
+	for projectNumber := range projectNumbers {
+		m.Lock()
+		alreadyProcessed := allProjectNumbers[projectNumber]
+		if !alreadyProcessed {
+			allProjectNumbers[projectNumber] = true
+		}
+		m.Unlock()
+		if !alreadyProcessed {
+			if project, err := processProject(projectNumber); err != nil {
+				logger.Printf("ERROR: While processing "+
+					"<https://gepris.dfg.de/gepris/projekt/%v>: %v", projectNumber, err)
+			} else {
+				projects <- project
+			}
+		}
+	}
+}
+
+func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for project := range projects {
+		var oldProject map[string]any
+		if err := coll.FindOne(context.Background(), bson.M{"number": project.getNumber()}).
+			Decode(&oldProject); err != nil && !errors.Is(err, mongodb.ErrNoDocuments) {
+			logger.Panic(err)
+		}
+		if oldProject == nil || project.isDifferent(oldProject) {
+			if oldProject == nil {
+				logger.Println("DEBUG: project is new")
+			} else {
+				logger.Println("DEBUG: project has changed")
+			}
+			filter, update := project.updateMongo()
+			mongo.UpdateLastModificationTimestamp(update)
+			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
+			check(err)
+			if result.UpsertedCount+result.ModifiedCount != 1 {
+				logger.Println("ERROR: project was not written properly to MongoDB")
+			}
+		} else {
+			logger.Println("DEBUG: project is unchanged")
+		}
+	}
+}
+
 // The main routine has three operations that run in parallel: (1) The search
 // results of GEPRIS are downloaded and searched for project numbers.  (2) The
 // project numbers are used to download the project details, which are searched
@@ -242,6 +290,7 @@ func main() {
 		defer func() { err := mongoClient.Disconnect(context.Background()); check(err) }()
 		coll = coll_
 	}
+
 	var projectWorkersWaitGroup sync.WaitGroup
 	projectNumbers := make(chan string, 10*numberProjectWorkers)
 	projects := make(chan projecter)
@@ -249,54 +298,14 @@ func main() {
 	var allProjectNumbersMutex sync.RWMutex
 	for i := 0; i < numberProjectWorkers; i++ {
 		projectWorkersWaitGroup.Add(1)
-		go func() {
-			defer projectWorkersWaitGroup.Done()
-			for projectNumber := range projectNumbers {
-				allProjectNumbersMutex.Lock()
-				alreadyProcessed := allProjectNumbers[projectNumber]
-				if !alreadyProcessed {
-					allProjectNumbers[projectNumber] = true
-				}
-				allProjectNumbersMutex.Unlock()
-				if !alreadyProcessed {
-					if project, err := processProject(projectNumber); err != nil {
-						logger.Printf("ERROR: While processing "+
-							"<https://gepris.dfg.de/gepris/projekt/%v>: %v", projectNumber, err)
-					} else {
-						projects <- project
-					}
-				}
-			}
-		}()
+		go processProjectNumbers(
+			projectNumbers, projects, &projectWorkersWaitGroup, allProjectNumbers, &allProjectNumbersMutex)
 	}
+
 	var projectStorageWaitGroup sync.WaitGroup
 	projectStorageWaitGroup.Add(1)
-	go func() {
-		defer projectStorageWaitGroup.Done()
-		for project := range projects {
-			var oldProject map[string]any
-			if err := coll.FindOne(context.Background(), bson.M{"number": project.getNumber()}).
-				Decode(&oldProject); err != nil && !errors.Is(err, mongodb.ErrNoDocuments) {
-				logger.Panic(err)
-			}
-			if oldProject == nil || project.isDifferent(oldProject) {
-				if oldProject == nil {
-					logger.Println("DEBUG: project is new")
-				} else {
-					logger.Println("DEBUG: project has changed")
-				}
-				filter, update := project.updateMongo()
-				mongo.UpdateLastModificationTimestamp(update)
-				result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
-				check(err)
-				if result.UpsertedCount+result.ModifiedCount != 1 {
-					logger.Println("ERROR: project was not written properly to MongoDB")
-				}
-			} else {
-				logger.Println("DEBUG: project is unchanged")
-			}
-		}
-	}()
+	go storeProjects(projects, coll, &projectStorageWaitGroup)
+
 	for _, year := range years {
 		index := 0
 		for {
@@ -309,9 +318,11 @@ func main() {
 			index += resultsPerPage
 		}
 	}
+
 	close(projectNumbers)
 	projectWorkersWaitGroup.Wait()
 	close(projects)
 	projectStorageWaitGroup.Wait()
+
 	updateParentTitles(coll)
 }
