@@ -177,6 +177,54 @@ type grantDocument struct {
 	ParentTitle string
 }
 
+func updateParentTitles(coll *mongodb.Collection) {
+	logger.Println("INFO: updating all parent project titles …")
+	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
+		logger.Panic("could not access MongoDB")
+	} else {
+		defer func() { err := cursor.Close(context.Background()); check(err) }()
+		titles := make(map[string]string)
+		for cursor.Next(context.Background()) {
+			var document grantDocument
+			if err := cursor.Decode(&document); err != nil {
+				logger.Panicf("invalid record in MongoDB: %v", err)
+			}
+			if document.Parent == "" {
+				continue
+			}
+			titles[document.Number] = document.Title
+			var title string
+			if foundTitle, ok := titles[document.Parent]; !ok {
+				var parentDocument grantDocument
+				if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
+					Decode(&parentDocument); err != nil {
+					logger.Printf("ERROR: MongoDB result invalid for %v: %v", document.Parent, err)
+				} else {
+					title = parentDocument.Title
+					if title == "" {
+						logger.Printf("ERROR: no title of %v found", document.Parent)
+						continue
+					}
+					titles[parentDocument.Number] = parentDocument.Title
+				}
+			} else {
+				title = foundTitle
+			}
+			if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
+				bson.D{{"$set", bson.M{"parentTitle": title}}}); err != nil {
+				logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
+			} else {
+				if result.UpsertedCount+result.MatchedCount != 1 {
+					logger.Println("ERROR: parent title was not written properly to MongoDB:", result)
+				} else {
+					logger.Printf("DEBUG: updated parent title of %v to “%v”", document.Number, title)
+				}
+			}
+		}
+	}
+	logger.Println("INFO: finished updating all parent project titles")
+}
+
 // The main routine has three operations that run in parallel: (1) The search
 // results of GEPRIS are downloaded and searched for project numbers.  (2) The
 // project numbers are used to download the project details, which are searched
@@ -266,49 +314,5 @@ func main() {
 	projectWorkersWaitGroup.Wait()
 	close(projects)
 	projectStorageWaitGroup.Wait()
-	logger.Println("INFO: updating all parent project titles …")
-	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
-		logger.Panic("could not access MongoDB")
-	} else {
-		defer func() { err := cursor.Close(context.Background()); check(err) }()
-		titles := make(map[string]string)
-		for cursor.Next(context.Background()) {
-			var document grantDocument
-			if err := cursor.Decode(&document); err != nil {
-				logger.Panicf("invalid record in MongoDB: %v", err)
-			}
-			if document.Parent == "" {
-				continue
-			}
-			titles[document.Number] = document.Title
-			var title string
-			if foundTitle, ok := titles[document.Parent]; !ok {
-				var parentDocument grantDocument
-				if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
-					Decode(&parentDocument); err != nil {
-					logger.Printf("ERROR: MongoDB result invalid for %v: %v", document.Parent, err)
-				} else {
-					title = parentDocument.Title
-					if title == "" {
-						logger.Printf("ERROR: no title of %v found", document.Parent)
-						continue
-					}
-					titles[parentDocument.Number] = parentDocument.Title
-				}
-			} else {
-				title = foundTitle
-			}
-			if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
-				bson.D{{"$set", bson.M{"parentTitle": title}}}); err != nil {
-				logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
-			} else {
-				if result.UpsertedCount+result.MatchedCount != 1 {
-					logger.Println("ERROR: parent title was not written properly to MongoDB:", result)
-				} else {
-					logger.Printf("DEBUG: updated parent title of %v to “%v”", document.Number, title)
-				}
-			}
-		}
-	}
-	logger.Println("INFO: finished updating all parent project titles")
+	updateParentTitles(coll)
 }
