@@ -26,3 +26,20 @@ crawler
 pmh
   This is supposed to be run continuously.  It exposes a PMH interface to fetch
   the projects.
+
+
+The crawler
+-----------
+
+You install the crawler by calling
+
+::
+   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/crawler
+
+from the root directory of the source code.  Then, you can invoke it with
+“crawler”.  It takes the following environment variables:
+
+MONGODB_HOST
+  URI to the MongoDB instance.  The GEPRIS crawler – this includes the PMH
+  server – creates a database called “gepris“ in MongoDB.  MONGODB_HOST
+  defaults to “mongodb://localhost”.
