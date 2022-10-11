@@ -24,8 +24,8 @@ crawler
   database.
 
 pmh
-  This is supposed to be run continuously.  It exposes a PMH interface to fetch
-  the projects.
+  This is supposed to be run continuously.  It exposes an OAI-PMH interface to
+  fetch the projects.
 
 
 The crawler
@@ -54,3 +54,20 @@ CRAWLER_DEBUG
 CRAWLER_FULL
   By default, only the current calender year and the year before are crawled.
   By setting CRAWLER_FULL to “1”, the whole GEPRIS is downloaded.
+
+
+The PMH server
+--------------
+
+You install the crawler by calling
+::
+
+   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/pmh
+
+from the root directory of the source code.  Then, you can invoke it with
+“pmh”.  It listens on port 8000.  It takes the following environment variable:
+
+MONGODB_HOST
+  URI to the MongoDB instance.  The PMH server – as the crawler –  creates a
+  database called “gepris“ in MongoDB.  MONGODB_HOST defaults to
+  “mongodb://localhost”.
