@@ -59,7 +59,7 @@ func init() {
 			logger.Println("DEBUG: Dial!")
 			return net.Dial(network, addr)
 		},
-		MaxIdleConnsPerHost: numberSearchWorkers + numberProjectWorkers,
+		MaxIdleConnsPerHost: numberProjectWorkers + 1,
 	}
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	check(err)

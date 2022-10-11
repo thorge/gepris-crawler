@@ -65,7 +65,6 @@ func init() {
 }
 
 const (
-	numberSearchWorkers  = 4
 	numberProjectWorkers = 4
 	triesLeft            = 10
 	maxWaitMillisec      = 10000
