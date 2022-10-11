@@ -4,11 +4,11 @@ GEPRIS crawler
 Goal
 ----
 
-Unfortunately, the project database of the German Reserach Foundation (Deutsche
-Forschungsgemeinschaft, DFG) is only available as a Web interface.  Moreover,
-the DFG does not plan to offer it in reusable form.  Still, librarians and
-others need to add metadata for German reserach projects into their local
-systems.
+Unfortunately, the project database of the German Research Foundation (Deutsche
+Forschungsgemeinschaft, DFG) is only available as a browser interface.
+Moreover, the DFG does not plan to offer it in reusable form.  Still,
+librarians and others need to add metadata for German research projects into
+their local systems.
 
 This is where the GEPRIS crawler comes into play.  It makes it possible to
 retrieve project metadata in an automatic way.
@@ -32,8 +32,8 @@ The crawler
 -----------
 
 You install the crawler by calling
-
 ::
+
    go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/crawler
 
 from the root directory of the source code.  Then, you can invoke it with
