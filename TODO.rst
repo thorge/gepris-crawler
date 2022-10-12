@@ -65,3 +65,6 @@ Things to improve
 - Get rid of buildGrantOnlyHeader.
 - Revisit error value creation and dealing with error values.  At the same
   time, enrich the doc comments with how errors are returned.
+- MARCXML embedding into PMH should be done according to
+  <http://www.openarchives.org/OAI/2.0/guidelines-marcxml.htm>.  In particular,
+  there is no ``<collection>``.
