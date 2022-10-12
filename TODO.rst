@@ -5,14 +5,6 @@ A good template for a DFG grant as MARCXML is
 <https://juser.fz-juelich.de/record/909442/export/xm>.
 
 
-- lastModification is useless currently as all records are overwritten
-  unconditionally.  Instead, I will have to read the project from MongoDB and
-  compare it with what I found in GEPRIS.  If different (excluding the
-  lastModification field of course), the record needs to be updated.
-  Unfortunately, the comparison has to be field-by-field.  I know of no
-  existing function.
-
-
 Things to discuss
 -----------------
 
