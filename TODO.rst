@@ -11,9 +11,10 @@ Things to discuss
 - Is 024__2 (link to this crawler) okay?
 - How do we deal with the mix of institutions and people in MARC field 371?  In
   particular, may also be an institution in field 371?
-- Is the out-most element “collection” in the MARCXML output correct?  The
-  Dublin Code output in the PMH spec contains an out-most element that is *not*
-  part of Dublin Core but of OAI.  In *contains* Dublin Core elements.
+- Is the out-most element “collection” in the MARCXML output correct?
+  http://www.openarchives.org/OAI/2.0/guidelines-marcxml.htm says otherwise.
+  The Dublin Code output in the PMH spec contains an out-most element that is
+  *not* part of Dublin Core but of OAI.  It *contains* Dublin Core elements.
   However, in MARCXML, the out-most element “collection” serves both: It is
   MARCXML proper but also the OAI-PMH “container” of the MARC data.  Is this
   correct, or must it be wrapped in another root element?
@@ -57,9 +58,6 @@ Things to improve
 - Get rid of buildGrantOnlyHeader.
 - Revisit error value creation and dealing with error values.  At the same
   time, enrich the doc comments with how errors are returned.
-- MARCXML embedding into PMH should be done according to
-  <http://www.openarchives.org/OAI/2.0/guidelines-marcxml.htm>.  In particular,
-  there is no ``<collection>``.
 - Get rid of AmbiguousArgsError.  Instead, an errorData should be returned.
 - Many structs passed by value should be passed as pointers.
-- The whitelists should be global variables
+- The whitelists should be global variables.
