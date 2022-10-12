@@ -60,3 +60,6 @@ Things to improve
   identifier (URL, URN, DOI, etc.) of the associated resource.”
 - An <about> tag in the XML output may be interesting for both denoting the
   origin of the data and the legal status of it.
+- grantEntryOnlyHeader may be removed and grantEntry used instead with the
+  “metadata” field marked as “omitempty”.
+- Get rid of buildGrantOnlyHeader.
