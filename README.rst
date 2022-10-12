@@ -36,8 +36,10 @@ crawler
   database.
 
 pmh
-  This is supposed to be run continuously.  It exposes an OAI-PMH interface to
+  This is supposed to be run continuously.  It exposes an OAI-PMH_ interface to
   fetch the projects.
+
+.. _OAI-PMH: http://www.openarchives.org/OAI/openarchivesprotocol.html
 
 
 The crawler
@@ -46,15 +48,14 @@ The crawler
 You install the crawler by calling
 ::
 
-   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/crawler
+   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/crawler@latest
 
-from the root directory of the source code.  Then, you can invoke it with
-“crawler”.  It takes the following environment variables:
+Then, you can invoke it with “crawler”.  It takes the following environment
+variables:
 
 MONGODB_HOST
-  URI to the MongoDB instance.  The GEPRIS crawler – this includes the PMH
-  server – creates a database called “gepris“ in MongoDB.  MONGODB_HOST
-  defaults to “mongodb://localhost”.
+  URI to the MongoDB instance.  The GEPRIS crawler creates a database called
+  “gepris“ in MongoDB.  MONGODB_HOST defaults to “mongodb://localhost”.
 
 CRAWLER_DEBUG
   If set to “1”, the crawler will cache the fetched HTML pages in the
@@ -74,12 +75,12 @@ The PMH server
 You install the crawler by calling
 ::
 
-   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/pmh
+   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/pmh@latest
 
-from the root directory of the source code.  Then, you can invoke it with
-“pmh”.  It listens on port 8000.  It takes the following environment variable:
+Then, you can invoke it with “pmh”.  It listens on port 8000.  It takes the
+following environment variable:
 
 MONGODB_HOST
-  URI to the MongoDB instance.  The PMH server – as the crawler –  creates a
-  database called “gepris“ in MongoDB.  MONGODB_HOST defaults to
-  “mongodb://localhost”.
+  URI to the MongoDB instance.  The PMH server creates a database called
+  “gepris“ in MongoDB (which is empty before the first crawler run).
+  MONGODB_HOST defaults to “mongodb://localhost”.
