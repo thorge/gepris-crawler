@@ -13,6 +13,18 @@ their local systems.
 This is where the GEPRIS crawler comes into play.  It makes it possible to
 retrieve project metadata in an automatic way.
 
+.. warning::
+   Make sure that your crawling does not put unacceptable burden on the GEPRIS
+   service.  In particular, choose crawling times when low GEPRIS usage is to
+   be expected (e.g. night hours in European time zones), do not fiddle around
+   with the rate limiting settings, and don’t call the crawler frequently.
+   While debugging, make use of the CRAWLER_DEBUG environment variable, see
+   below.
+
+   Before considering setting up an own crawler, see whether you can harvest an
+   existing PMH server.  If you run a PMH server, you may want to tell us about
+   it so that we can advertise it here for the benefit of others.
+
 
 Architecture
 ------------
