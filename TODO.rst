@@ -68,3 +68,4 @@ Things to improve
 - MARCXML embedding into PMH should be done according to
   <http://www.openarchives.org/OAI/2.0/guidelines-marcxml.htm>.  In particular,
   there is no ``<collection>``.
+- Get rid of AmbiguousArgsError.  Instead, an errorData should be returned.
