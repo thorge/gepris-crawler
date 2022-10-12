@@ -63,3 +63,5 @@ Things to improve
 - grantEntryOnlyHeader may be removed and grantEntry used instead with the
   “metadata” field marked as “omitempty”.
 - Get rid of buildGrantOnlyHeader.
+- Revisit error value creation and dealing with error values.  At the same
+  time, enrich the doc comments with how errors are returned.
