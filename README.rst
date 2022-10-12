@@ -23,7 +23,8 @@ retrieve project metadata in an automatic way.
 
    Before considering setting up an own crawler, see whether you can harvest an
    existing PMH server.  If you run a PMH server, you may want to tell us about
-   it so that we can advertise it here for the benefit of others.
+   it so that we can advertise it here for the benefit of others.  See the
+   contact address at the bottom.
 
 
 Architecture
@@ -84,3 +85,11 @@ MONGODB_HOST
   URI to the MongoDB instance.  The PMH server creates a database called
   “gepris“ in MongoDB (which is empty before the first crawler run).
   MONGODB_HOST defaults to “mongodb://localhost”.
+
+
+Contact
+-------
+
+Author and maintainer of this GEPRIS crawler is `Torsten Bronger`_.
+
+.. _Torsten Bronger: mailto:t.bronger@fz-juelich.de
