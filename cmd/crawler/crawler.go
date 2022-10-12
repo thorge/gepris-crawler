@@ -2,10 +2,7 @@
 crawler downloads project data from GEPRIS.
 It stores the data in a MongoDB.
 
-Environment variables:
-
-GEPRIS_CRAWLER_LOG_PATH – path to the directory to which the log file is
-written.  If not given, the log is sent to stderr.
+See the README file for further information.
 */
 package main
 
@@ -162,6 +159,8 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 	return nil
 }
 
+// getYears returns the years of funding to be searched by the crawler.  If all
+// projects should be found, it returns a single 0.
 func getYears() []int {
 	if os.Getenv("CRAWLER_FULL") == "1" {
 		return []int{0}
@@ -171,6 +170,9 @@ func getYears() []int {
 	}
 }
 
+// grantDocument is used by updateParentTitles to hold MongoDB results.
+// Therefore, it contains only the subset of fields of grants that are needed
+// here.
 type grantDocument struct {
 	Number      string
 	Title       string
@@ -178,6 +180,12 @@ type grantDocument struct {
 	ParentTitle string
 }
 
+// updateParentTitles walks through all projects in the MongoDB database and
+// sets the parent titles according to the parent numbers.  When fetching the
+// projects from teh GEPRIS, we only get the *number* of the parent project.
+// But when returning results in PMH requests, we also need the title.  In
+// order to avoid having to query for them then, we use denormalisation by
+// adding the parent’s title here.
 func updateParentTitles(coll *mongodb.Collection) {
 	logger.Println("INFO: updating all parent project titles …")
 	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
@@ -226,6 +234,13 @@ func updateParentTitles(coll *mongodb.Collection) {
 	logger.Println("INFO: finished updating all parent project titles")
 }
 
+// processProjectNumbers is meant to run in multiple instances parallelly.  It
+// reads project numbers from a channel “projectNumbers”, scrapes the projects’
+// data from the GEPRIS website, and writes the results back into another
+// channel “projects”.  It finishes when projectNumbers is closed and reports
+// this back in the given wait group.  “allProjectNumbers” holds a map created
+// by the caller that contains all process numbers already processed because
+// some may occur multiple times in “projectNumbers”.
 func processProjectNumbers(projectNumbers <-chan string, projects chan<- projecter, wg *sync.WaitGroup,
 	allProjectNumbers map[string]bool, m *sync.RWMutex) {
 	defer wg.Done()
@@ -247,6 +262,9 @@ func processProjectNumbers(projectNumbers <-chan string, projects chan<- project
 	}
 }
 
+// storeProjects reads projects from “projects” and writes them to MongoDB.  It
+// must not be run with multiple instances.  It reports back on the given wait
+// groups when it’s finished.
 func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for project := range projects {

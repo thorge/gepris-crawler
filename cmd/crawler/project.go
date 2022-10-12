@@ -9,8 +9,21 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// Types of the projecter interface are able to scan data from a project HTML
+// page and fill their internal data structure with it.  Then, they can prepare
+// the data structures needed to write it to the MongoDB database.  This
+// abstraction is useful because GEPRIS projects fall into some categories with
+// different HTML parsing and datafield requirements.
+type projecter interface {
+	scanDocument(doc *goquery.Document) error
+	updateMongo() (bson.M, bson.M)
+	isDifferent(oldProject map[string]any) bool
+	getNumber() string
+}
+
 // projectBase contains the data included in every DFG project.  This is an
-// abstract type that is only embedded into others.
+// abstract type that is only embedded into others.  It must have a number,
+// a title, and a process.
 type projectBase struct {
 	number             string
 	title              string
@@ -22,214 +35,6 @@ type projectBase struct {
 	description        string
 	parent             string
 	parentTitle        string
-}
-
-// projectPerson contains the data of a project the applicant of which is a
-// person.
-type projectPerson struct {
-	projectBase
-	applicants []string
-	partPeople []string
-}
-
-// projectInstitution contains the data of a project the applicant of which is
-// an institution.
-type projectInstitution struct {
-	projectBase
-	institutions     []string
-	coInstitutions   []string
-	partInstitutions []string
-	speakers         []string
-	coSpeakers       []string
-	partPeople       []string
-}
-
-type projectUmbrella struct {
-	projectBase
-	institutions     []string
-	coInstitutions   []string
-	partInstitutions []string
-	speakers         []string
-	coSpeakers       []string
-	partPeople       []string
-}
-
-// updateMongo returns the “filter” and “update” parameters ready to be used
-// for “mongo.Collection.UpdateOne”.
-func (project projectBase) updateMongo() (bson.M, bson.M) {
-	filter := bson.M{"number": project.number}
-	update := bson.M{
-		"number":      project.number,
-		"title":       project.title,
-		"shortTitle":  project.shortTitle,
-		"process":     project.process,
-		"startYear":   project.startYear,
-		"endYear":     project.endYear,
-		"disciplines": project.disciplines,
-		"url":         project.url,
-		"description": project.description,
-		"parent":      project.parent,
-		"parentTitle": project.parentTitle,
-	}
-	return filter, update
-}
-
-func (project projectBase) getNumber() string {
-	return project.number
-}
-
-func equal(a []string, b any) bool {
-	if b == nil {
-		return len(a) == 0
-	}
-	bAsArray := b.(bson.A)
-	if len(a) != len(bAsArray) {
-		return false
-	}
-	for i, v := range a {
-		if v != bAsArray[i].(string) {
-			return false
-		}
-	}
-	return true
-}
-
-func (project projectBase) isDifferent(oldProject map[string]any) bool {
-	if project.number != oldProject["number"].(string) {
-		logger.Panic("comparison with project with different project number does not make sense")
-	}
-	return project.title != oldProject["title"].(string) ||
-		project.shortTitle != oldProject["shortTitle"].(string) ||
-		project.process != oldProject["process"].(string) ||
-		project.startYear != int(oldProject["startYear"].(int32)) ||
-		project.endYear != int(oldProject["endYear"].(int32)) ||
-		!equal(project.disciplines, oldProject["disciplines"]) ||
-		project.url != oldProject["url"].(string) ||
-		project.description != oldProject["description"].(string) ||
-		project.parent != oldProject["parent"].(string)
-}
-
-// updateMongo returns the “filter” and “update” parameters ready to be used
-// for “mongo.Collection.UpdateOne”.
-func (project projectPerson) updateMongo() (bson.M, bson.M) {
-	filter, update := project.projectBase.updateMongo()
-	update["type"] = "personal"
-	update["applicants"] = project.applicants
-	update["partPeople"] = project.partPeople
-	return filter, update
-}
-
-func (project projectPerson) isDifferent(oldProject map[string]any) bool {
-	return project.projectBase.isDifferent(oldProject) ||
-		oldProject["type"].(string) != "personal" ||
-		!equal(project.applicants, oldProject["applicants"]) ||
-		!equal(project.partPeople, oldProject["partPeople"])
-}
-
-// updateMongo returns the “filter” and “update” parameters ready to be used
-// for “mongo.Collection.UpdateOne”.
-func (project projectInstitution) updateMongo() (bson.M, bson.M) {
-	filter, update := project.projectBase.updateMongo()
-	update["type"] = "institutional"
-	update["institutions"] = project.institutions
-	update["coInstitutions"] = project.coInstitutions
-	update["partInstitutions"] = project.partInstitutions
-	update["speakers"] = project.speakers
-	update["coSpeakers"] = project.coSpeakers
-	update["partPeople"] = project.partPeople
-	return filter, update
-}
-
-func (project projectInstitution) isDifferent(oldProject map[string]any) bool {
-	return project.projectBase.isDifferent(oldProject) ||
-		oldProject["type"].(string) != "institutional" ||
-		!equal(project.institutions, oldProject["institutions"]) ||
-		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
-		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
-		!equal(project.speakers, oldProject["speakers"]) ||
-		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
-		!equal(project.partPeople, oldProject["partPeople"])
-}
-
-// updateMongo returns the “filter” and “update” parameters ready to be used
-// for “mongo.Collection.UpdateOne”.
-func (project projectUmbrella) updateMongo() (bson.M, bson.M) {
-	filter, update := project.projectBase.updateMongo()
-	update["type"] = "umbrella"
-	update["institutions"] = project.institutions
-	update["coInstitutions"] = project.coInstitutions
-	update["partInstitutions"] = project.partInstitutions
-	update["speakers"] = project.speakers
-	update["coSpeakers"] = project.coSpeakers
-	update["partPeople"] = project.partPeople
-	return filter, update
-}
-
-func (project projectUmbrella) isDifferent(oldProject map[string]any) bool {
-	return project.projectBase.isDifferent(oldProject) ||
-		oldProject["type"].(string) != "umbrella" ||
-		!equal(project.institutions, oldProject["institutions"]) ||
-		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
-		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
-		!equal(project.speakers, oldProject["speakers"]) ||
-		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
-		!equal(project.partPeople, oldProject["partPeople"])
-}
-
-// Types of the projecter interface are able to take data from a project HTML
-// page and fill their internal data structure with it.  Then, they
-type projecter interface {
-	scanDocument(doc *goquery.Document) error
-	updateMongo() (bson.M, bson.M)
-	getNumber() string
-	isDifferent(oldProject map[string]any) bool
-}
-
-// parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.
-func parseDisciplines(doc *goquery.Document) (disciplines []string) {
-	doc.Find(`span.name`).FilterFunction(filterByRegexp(disciplineRegexp)).Next().
-		FilterFunction(func(i int, s *goquery.Selection) bool {
-			return s.Nodes[0].Type == 3
-		}).Each(func(i int, s *goquery.Selection) {
-		disciplines = append(disciplines, normalizeString(s.Text()))
-	})
-	return
-}
-
-// parseLinkList returns all items found in the given subset of HTML elements.
-// More precisely, the items are the text content in the “<a class="intern"
-// href="…">…</a>” elements.
-func parseLinkList(s *goquery.Selection) (elements []string) {
-	s.Find("a.intern").Each(func(i int, s *goquery.Selection) {
-		elements = append(elements, normalizeString(s.Text()))
-	})
-	return
-}
-
-var urlRegexp = regexp.MustCompile(`^/gepris/projekt/(\d+)$`)
-
-func getParent(doc *goquery.Document) (string, error) {
-	fieldNode := doc.Find(`span.name`).FilterFunction(filterByRegexp(parentRegexp)).Next()
-	if fieldNode.Length() == 0 {
-		return "", nil
-	} else if fieldNode.Length() > 1 {
-		return "", fmt.Errorf("ambiguous “Teilprojekt zu” field")
-	}
-	linkNode := fieldNode.Find("a.intern")
-	if linkNode.Length() != 1 {
-		return "", fmt.Errorf("not exactly one link in “Teilprojekt zu” field")
-	}
-	var url string
-	if value, exists := linkNode.Attr("href"); !exists {
-		return "", fmt.Errorf("no URL to parent project found in “Teilprojekt zu”")
-	} else {
-		url = value
-	}
-	if match := urlRegexp.FindStringSubmatch(url); match == nil {
-		return "", fmt.Errorf("invalid URL found in “Teilprojekt zu”")
-	} else {
-		return match[1], nil
-	}
 }
 
 // scanDocument fills the internal data fields of the project with the data
@@ -277,6 +82,61 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	return nil
 }
 
+// updateMongo returns the “filter” and “update” parameters ready to be used
+// for “mongo.Collection.UpdateOne”.
+func (project projectBase) updateMongo() (bson.M, bson.M) {
+	filter := bson.M{"number": project.number}
+	update := bson.M{
+		"number":      project.number,
+		"title":       project.title,
+		"shortTitle":  project.shortTitle,
+		"process":     project.process,
+		"startYear":   project.startYear,
+		"endYear":     project.endYear,
+		"disciplines": project.disciplines,
+		"url":         project.url,
+		"description": project.description,
+		"parent":      project.parent,
+		"parentTitle": project.parentTitle,
+	}
+	return filter, update
+}
+
+// isDifferent returns whether the given project “oldProject” is different from
+// the one this method is called on.  “oldProject” is usually taken from the
+// MongoDB database, and we want to know whether it needs to be updated (with a
+// touched lastModification field).  Note that “oldProject” is a mapping
+// string → any because this is the lowest common denominator for all project
+// types (person, institution, and umbrella).
+func (project projectBase) isDifferent(oldProject map[string]any) bool {
+	if project.number != oldProject["number"].(string) {
+		logger.Panic("comparison with project with different project number does not make sense")
+	}
+	return project.title != oldProject["title"].(string) ||
+		project.shortTitle != oldProject["shortTitle"].(string) ||
+		project.process != oldProject["process"].(string) ||
+		project.startYear != int(oldProject["startYear"].(int32)) ||
+		project.endYear != int(oldProject["endYear"].(int32)) ||
+		!equal(project.disciplines, oldProject["disciplines"]) ||
+		project.url != oldProject["url"].(string) ||
+		project.description != oldProject["description"].(string) ||
+		project.parent != oldProject["parent"].(string)
+}
+
+// getNumber returns the project number.
+func (project projectBase) getNumber() string {
+	return project.number
+}
+
+// projectPerson contains the data of a project the applicant of which is a
+// person.  Additionally to the requirements of projectBase, it must contain at
+// least one applicant.
+type projectPerson struct {
+	projectBase
+	applicants []string
+	partPeople []string
+}
+
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
 func (project *projectPerson) scanDocument(doc *goquery.Document) error {
@@ -302,23 +162,40 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	return nil
 }
 
-var leiterRegexp = regexp.MustCompile(`^\s*(Teilprojektleiter|Sprecher|Leiter)(in(nen)?)?` +
-	`( / (Teilprojektleiter|Sprecher|Leiter))?\s*$`)
-var disciplineRegexp = regexp.MustCompile(`^\s*Fachliche Zuordnung\s*$`)
-var processRegexp = regexp.MustCompile(`^\s*DFG-Verfahren\s*$`)
-var parentRegexp = regexp.MustCompile(`^\s*Teilprojekt zu\s*$`)
-var applicantRegexp = regexp.MustCompile(`^\s*Antragsteller(in(nen)?)?( / Antragsteller)?\s*$`)
-var partPeopleRegexp = regexp.MustCompile(`^\s*Beteiligte Person(en)?\s*$`)
-var institutionsRegexp = regexp.MustCompile(`^\s*Antragstellende Institution\s*$`)
-var coInstitutionsRegexp = regexp.MustCompile(`^\s*Mitantragstellende Institution\s*$`)
-var partInstitutionsRegexp = regexp.MustCompile(`^\s*Beteiligte Einrichtung\s*$`)
-var coSpeakersRegexp = regexp.MustCompile(`^\s*Co-Sprecher(in(nen)?)?( / Co-Sprecher)?\s*$`)
-var fundingRegexp = regexp.MustCompile(`^\s*Förderung\s*$`)
+// updateMongo returns the “filter” and “update” parameters ready to be used
+// for “mongo.Collection.UpdateOne”.
+func (project projectPerson) updateMongo() (bson.M, bson.M) {
+	filter, update := project.projectBase.updateMongo()
+	update["type"] = "personal"
+	update["applicants"] = project.applicants
+	update["partPeople"] = project.partPeople
+	return filter, update
+}
 
-func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
-	return func(_ int, s *goquery.Selection) bool {
-		return re.MatchString(s.Text())
-	}
+// isDifferent returns whether the given project “oldProject” is different from
+// the one this method is called on.  “oldProject” is usually taken from the
+// MongoDB database, and we want to know whether it needs to be updated (with a
+// touched lastModification field).  Note that “oldProject” is a mapping
+// string → any because this is the lowest common denominator for all project
+// types (person, institution, and umbrella).
+func (project projectPerson) isDifferent(oldProject map[string]any) bool {
+	return project.projectBase.isDifferent(oldProject) ||
+		oldProject["type"].(string) != "personal" ||
+		!equal(project.applicants, oldProject["applicants"]) ||
+		!equal(project.partPeople, oldProject["partPeople"])
+}
+
+// projectInstitution contains the data of a project the applicant of which is
+// an institution.  Additionally to the requirements of projectBase, at least
+// one item in “institutions” is a requirement.
+type projectInstitution struct {
+	projectBase
+	institutions     []string
+	coInstitutions   []string
+	partInstitutions []string
+	speakers         []string
+	coSpeakers       []string
+	partPeople       []string
 }
 
 // scanDocument fills the internal data fields of the project with the data
@@ -358,6 +235,49 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	return nil
 }
 
+// updateMongo returns the “filter” and “update” parameters ready to be used
+// for “mongo.Collection.UpdateOne”.
+func (project projectInstitution) updateMongo() (bson.M, bson.M) {
+	filter, update := project.projectBase.updateMongo()
+	update["type"] = "institutional"
+	update["institutions"] = project.institutions
+	update["coInstitutions"] = project.coInstitutions
+	update["partInstitutions"] = project.partInstitutions
+	update["speakers"] = project.speakers
+	update["coSpeakers"] = project.coSpeakers
+	update["partPeople"] = project.partPeople
+	return filter, update
+}
+
+// isDifferent returns whether the given project “oldProject” is different from
+// the one this method is called on.  “oldProject” is usually taken from the
+// MongoDB database, and we want to know whether it needs to be updated (with a
+// touched lastModification field).  Note that “oldProject” is a mapping
+// string → any because this is the lowest common denominator for all project
+// types (person, institution, and umbrella).
+func (project projectInstitution) isDifferent(oldProject map[string]any) bool {
+	return project.projectBase.isDifferent(oldProject) ||
+		oldProject["type"].(string) != "institutional" ||
+		!equal(project.institutions, oldProject["institutions"]) ||
+		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
+		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
+		!equal(project.speakers, oldProject["speakers"]) ||
+		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
+		!equal(project.partPeople, oldProject["partPeople"])
+}
+
+// projectUmbrella represents a DFG project with sub projects.  It inherits the
+// requirements of projectBase and adds no own.
+type projectUmbrella struct {
+	projectBase
+	institutions     []string
+	coInstitutions   []string
+	partInstitutions []string
+	speakers         []string
+	coSpeakers       []string
+	partPeople       []string
+}
+
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
 func (project *projectUmbrella) scanDocument(doc *goquery.Document) error {
@@ -393,4 +313,127 @@ func (project *projectUmbrella) scanDocument(doc *goquery.Document) error {
 		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
 	}
 	return nil
+}
+
+// updateMongo returns the “filter” and “update” parameters ready to be used
+// for “mongo.Collection.UpdateOne”.
+func (project projectUmbrella) updateMongo() (bson.M, bson.M) {
+	filter, update := project.projectBase.updateMongo()
+	update["type"] = "umbrella"
+	update["institutions"] = project.institutions
+	update["coInstitutions"] = project.coInstitutions
+	update["partInstitutions"] = project.partInstitutions
+	update["speakers"] = project.speakers
+	update["coSpeakers"] = project.coSpeakers
+	update["partPeople"] = project.partPeople
+	return filter, update
+}
+
+// isDifferent returns whether the given project “oldProject” is different from
+// the one this method is called on.  “oldProject” is usually taken from the
+// MongoDB database, and we want to know whether it needs to be updated (with a
+// touched lastModification field).  Note that “oldProject” is a mapping
+// string → any because this is the lowest common denominator for all project
+// types (person, institution, and umbrella).
+func (project projectUmbrella) isDifferent(oldProject map[string]any) bool {
+	return project.projectBase.isDifferent(oldProject) ||
+		oldProject["type"].(string) != "umbrella" ||
+		!equal(project.institutions, oldProject["institutions"]) ||
+		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
+		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
+		!equal(project.speakers, oldProject["speakers"]) ||
+		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
+		!equal(project.partPeople, oldProject["partPeople"])
+}
+
+// equal returns whether the given slices of strings are equal, i.e. have the
+// same length and have identical items at each position.  “b” is expected to
+// be a bson.A array (or nil, which is consideres an empty array).
+func equal(a []string, b any) bool {
+	if b == nil {
+		return len(a) == 0
+	}
+	bAsArray := b.(bson.A)
+	if len(a) != len(bAsArray) {
+		return false
+	}
+	for i, v := range a {
+		if v != bAsArray[i].(string) {
+			return false
+		}
+	}
+	return true
+}
+
+// parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.
+func parseDisciplines(doc *goquery.Document) (disciplines []string) {
+	doc.Find(`span.name`).FilterFunction(filterByRegexp(disciplineRegexp)).Next().
+		FilterFunction(func(i int, s *goquery.Selection) bool {
+			return s.Nodes[0].Type == 3
+		}).Each(func(i int, s *goquery.Selection) {
+		disciplines = append(disciplines, normalizeString(s.Text()))
+	})
+	return
+}
+
+// parseLinkList returns all items found in the given subset of HTML elements.
+// More precisely, the items are the text content in the “<a class="intern"
+// href="…">…</a>” elements.
+func parseLinkList(s *goquery.Selection) (elements []string) {
+	s.Find("a.intern").Each(func(i int, s *goquery.Selection) {
+		elements = append(elements, normalizeString(s.Text()))
+	})
+	return
+}
+
+var urlRegexp = regexp.MustCompile(`^/gepris/projekt/(\d+)$`)
+
+// getParent returns the project number of the parent project.  The “doc”
+// argument contains the parsed HTML page for the project.  If it does not have
+// a parent, an empty string is returned.
+func getParent(doc *goquery.Document) (string, error) {
+	fieldNode := doc.Find(`span.name`).FilterFunction(filterByRegexp(parentRegexp)).Next()
+	if fieldNode.Length() == 0 {
+		return "", nil
+	} else if fieldNode.Length() > 1 {
+		return "", fmt.Errorf("ambiguous “Teilprojekt zu” field")
+	}
+	linkNode := fieldNode.Find("a.intern")
+	if linkNode.Length() != 1 {
+		return "", fmt.Errorf("not exactly one link in “Teilprojekt zu” field")
+	}
+	var url string
+	if value, exists := linkNode.Attr("href"); !exists {
+		return "", fmt.Errorf("no URL to parent project found in “Teilprojekt zu”")
+	} else {
+		url = value
+	}
+	if match := urlRegexp.FindStringSubmatch(url); match == nil {
+		return "", fmt.Errorf("invalid URL found in “Teilprojekt zu”")
+	} else {
+		return match[1], nil
+	}
+}
+
+// Helper regexps to be used when scanning DOMs in the scanDocument methods.
+var leiterRegexp = regexp.MustCompile(`^\s*(Teilprojektleiter|Sprecher|Leiter)(in(nen)?)?` +
+	`( / (Teilprojektleiter|Sprecher|Leiter))?\s*$`)
+var disciplineRegexp = regexp.MustCompile(`^\s*Fachliche Zuordnung\s*$`)
+var processRegexp = regexp.MustCompile(`^\s*DFG-Verfahren\s*$`)
+var parentRegexp = regexp.MustCompile(`^\s*Teilprojekt zu\s*$`)
+var applicantRegexp = regexp.MustCompile(`^\s*Antragsteller(in(nen)?)?( / Antragsteller)?\s*$`)
+var partPeopleRegexp = regexp.MustCompile(`^\s*Beteiligte Person(en)?\s*$`)
+var institutionsRegexp = regexp.MustCompile(`^\s*Antragstellende Institution\s*$`)
+var coInstitutionsRegexp = regexp.MustCompile(`^\s*Mitantragstellende Institution\s*$`)
+var partInstitutionsRegexp = regexp.MustCompile(`^\s*Beteiligte Einrichtung\s*$`)
+var coSpeakersRegexp = regexp.MustCompile(`^\s*Co-Sprecher(in(nen)?)?( / Co-Sprecher)?\s*$`)
+var fundingRegexp = regexp.MustCompile(`^\s*Förderung\s*$`)
+
+// filterByRegexp returns a function that is ready to be used as an argument to
+// goquery.FilterFunction.  Eventually, this reduces the nodes set to those
+// matching the given regexp.
+func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
+	return func(_ int, s *goquery.Selection) bool {
+		return re.MatchString(s.Text())
+	}
 }

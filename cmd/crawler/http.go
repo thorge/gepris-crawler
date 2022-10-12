@@ -15,7 +15,6 @@ import (
 )
 
 var client http.Client
-var ticker = make(chan time.Time, maxRequestsPerSec)
 
 // fetchPage downloads the given URL end returns the HTML.  If the server
 // answers with a 5xx status, the request is retried up to triesLeft times.
@@ -52,6 +51,11 @@ func fetchPage(url string) (string, error) {
 	return body, nil
 }
 
+var ticker = make(chan time.Time, maxRequestsPerSec)
+
+// enableTitle must be run as a Go routine that may be cancelled by the given
+// context.  It fills the global variable “ticker” with events at a frequency
+// of maxRequestsPerSec.
 func enableTicker(ctx context.Context) {
 	for t := range time.Tick(time.Second / maxRequestsPerSec) {
 		select {
@@ -64,6 +68,7 @@ func enableTicker(ctx context.Context) {
 	}
 }
 
+// This init function initialises the global “client” for fetchPage.
 func init() {
 	var transport = &http.Transport{
 		// Dial is the original function, plus a line in the log.  This way,
@@ -72,6 +77,7 @@ func init() {
 			logger.Println("DEBUG: Dial!")
 			return net.Dial(network, addr)
 		},
+		// “+ 1” for the connection for search results pages
 		MaxIdleConnsPerHost: numberProjectWorkers + 1,
 	}
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})

@@ -9,6 +9,9 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// getDocument returns the DOM for the given HTML document as a goquery
+// document.  This can then be used to search for text content needed to
+// retrieve the projects’ data.
 func getDocument(body string) (doc *goquery.Document, err error) {
 	doc, err = goquery.NewDocumentFromReader(strings.NewReader(body))
 	return
@@ -17,7 +20,7 @@ func getDocument(body string) (doc *goquery.Document, err error) {
 var whitespaceRegexp = regexp.MustCompile(`[\p{Z}\n\r\t]+`)
 
 // normalizeString replaces any whitespace characters sequence with a single
-// space.  Moreover, it removed leading and trailing whitespace.
+// space.  Moreover, it removes leading and trailing whitespace.
 func normalizeString(s string) (result string) {
 	result = whitespaceRegexp.ReplaceAllString(s, " ")
 	result = strings.TrimSpace(result)
@@ -44,10 +47,6 @@ func getField(s *goquery.Selection) (value string, err error) {
 	return value, err
 }
 
-var timespanRegex = regexp.MustCompile(`Förderung von (\d\d\d\d) bis (\d\d\d\d)|` +
-	`Förderung seit (\d\d\d\d)|Förderung in (\d\d\d\d)|Förderung: Bis (\d\d\d\d)|` +
-	`Befindet sich in der laufenden Förderung.`)
-
 // mustAtoi converts a string to an int and panics if something goes wrong.  It
 // is used for converting regexp submatched that I know for sure to be
 // integers.
@@ -58,6 +57,10 @@ func mustAtoi(s string) (i int) {
 	}
 	return
 }
+
+var timespanRegex = regexp.MustCompile(`Förderung von (\d\d\d\d) bis (\d\d\d\d)|` +
+	`Förderung seit (\d\d\d\d)|Förderung in (\d\d\d\d)|Förderung: Bis (\d\d\d\d)|` +
+	`Befindet sich in der laufenden Förderung.`)
 
 // parseTimespan returns start and end year for a project.  It gets the HTML
 // document of the project as input.  If any of start or end cannot be found in

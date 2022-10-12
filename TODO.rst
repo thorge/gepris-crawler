@@ -69,3 +69,5 @@ Things to improve
   <http://www.openarchives.org/OAI/2.0/guidelines-marcxml.htm>.  In particular,
   there is no ``<collection>``.
 - Get rid of AmbiguousArgsError.  Instead, an errorData should be returned.
+- Many structs passed by value should be passed as pointers.
+- The whitelists should be global variables
