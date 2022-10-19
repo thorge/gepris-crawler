@@ -242,7 +242,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 // by the caller that contains all process numbers already processed because
 // some may occur multiple times in “projectNumbers”.
 func processProjectNumbers(projectNumbers <-chan string, projects chan<- projecter, wg *sync.WaitGroup,
-	allProjectNumbers map[string]bool, m *sync.RWMutex) {
+	allProjectNumbers map[string]bool, m *sync.Mutex) {
 	defer wg.Done()
 	for projectNumber := range projectNumbers {
 		m.Lock()
@@ -316,7 +316,7 @@ func main() {
 	projectNumbers := make(chan string, 10*numberProjectWorkers)
 	projects := make(chan projecter)
 	allProjectNumbers := make(map[string]bool)
-	var allProjectNumbersMutex sync.RWMutex
+	var allProjectNumbersMutex sync.Mutex
 	for i := 0; i < numberProjectWorkers; i++ {
 		projectWorkersWaitGroup.Add(1)
 		go processProjectNumbers(
