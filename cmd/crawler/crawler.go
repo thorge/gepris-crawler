@@ -33,8 +33,9 @@ func check(e error) {
 }
 
 // setupLogging sets up logging into a file.  The file is called
-// “gepris-crawler”, and the directory is taken from the environment variable
-// GEPRIS_CRAWLER_LOG_PATH.  If this is not set, Go’s default logger ist used.
+// “gepris-crawler.log”, and the directory is taken from the environment
+// variable GEPRIS_CRAWLER_LOG_PATH.  If this is not set, Go’s default logger
+// ist used.
 func setupLogging() *log.Logger {
 	logPath := os.Getenv("GEPRIS_CRAWLER_LOG_PATH")
 	if logPath == "" {
