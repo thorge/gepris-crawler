@@ -8,7 +8,6 @@ A good template for a DFG grant as MARCXML is
 Things to discuss
 -----------------
 
-- Is 024__2 (link to this crawler) okay?
 - How do we deal with the mix of institutions and people in MARC field 371?  In
   particular, may also be an institution in field 371?
 - Is the out-most element “collection” in the MARCXML output correct?
