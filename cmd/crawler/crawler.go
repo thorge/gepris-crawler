@@ -183,7 +183,7 @@ type grantDocument struct {
 
 // updateParentTitles walks through all projects in the MongoDB database and
 // sets the parent titles according to the parent numbers.  When fetching the
-// projects from teh GEPRIS, we only get the *number* of the parent project.
+// projects from the GEPRIS, we only get the *number* of the parent project.
 // But when returning results in PMH requests, we also need the title.  In
 // order to avoid having to query for them then, we use denormalisation by
 // adding the parent’s title here.
