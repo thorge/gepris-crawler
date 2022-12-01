@@ -52,7 +52,6 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 	if project.title == "" {
 		return fmt.Errorf("project has no title")
 	}
-	project.shortTitle = fmt.Sprintf("DFG-Projekt %v", project.number)
 	project.process, err = getField(doc.Find(`span.name`).FilterFunction(filterByRegexp(processRegexp)).Next())
 	check(err)
 	if project.process == "" {

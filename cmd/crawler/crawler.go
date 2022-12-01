@@ -181,6 +181,26 @@ type grantDocument struct {
 	ParentTitle string
 }
 
+var sfbRegexp = regexp.MustCompile(`^SFB ([0-9]+)`)
+var subProjectRegexp = regexp.MustCompile(`\s+\(([^)]*)\)$`)
+var grkRegexp = regexp.MustCompile(`^(GRK [0-9]+)`)
+
+// findShortTitle uses heuristics to return a good abbreviated title for the
+// given project.  If none can be reliably created, en empty string is
+// returned.  Currently, SFB sub-projects (not the parent project, because they
+// should not not appear in selection lists) and GRKs are abbreviated.
+func findShortTitle(title, parentTitle string) string {
+	if parentMatches := sfbRegexp.FindStringSubmatch(parentTitle); parentMatches != nil {
+		if matches := subProjectRegexp.FindStringSubmatch(title); matches != nil {
+			return fmt.Sprintf("SFB %v %v", parentMatches[1], matches[1])
+		}
+	}
+	if matches := grkRegexp.FindStringSubmatch(title); matches != nil {
+		return matches[1]
+	}
+	return ""
+}
+
 // updateParentTitles walks through all projects in the MongoDB database and
 // sets the parent titles according to the parent numbers.  When fetching the
 // projects from the GEPRIS, we only get the *number* of the parent project.
@@ -199,35 +219,40 @@ func updateParentTitles(coll *mongodb.Collection) {
 			if err := cursor.Decode(&document); err != nil {
 				logger.Panicf("invalid record in MongoDB: %v", err)
 			}
-			if document.Parent == "" {
-				continue
-			}
 			titles[document.Number] = document.Title
 			var title string
-			if foundTitle, ok := titles[document.Parent]; !ok {
-				var parentDocument grantDocument
-				if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
-					Decode(&parentDocument); err != nil {
-					logger.Printf("ERROR: MongoDB result invalid for %v: %v", document.Parent, err)
-				} else {
-					title = parentDocument.Title
-					if title == "" {
-						logger.Printf("ERROR: no title of %v found", document.Parent)
-						continue
+			if document.Parent != "" {
+				if foundTitle, ok := titles[document.Parent]; !ok {
+					var parentDocument grantDocument
+					if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
+						Decode(&parentDocument); err != nil {
+						logger.Printf("ERROR: MongoDB result invalid for %v: %v",
+							document.Parent, err)
+					} else {
+						title = parentDocument.Title
+						if title == "" {
+							logger.Printf("ERROR: no title of %v found", document.Parent)
+							continue
+						}
+						titles[parentDocument.Number] = parentDocument.Title
 					}
-					titles[parentDocument.Number] = parentDocument.Title
-				}
-			} else {
-				title = foundTitle
-			}
-			if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
-				bson.D{{"$set", bson.M{"parentTitle": title}}}); err != nil {
-				logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
-			} else {
-				if result.UpsertedCount+result.MatchedCount != 1 {
-					logger.Println("ERROR: parent title was not written properly to MongoDB:", result)
 				} else {
-					logger.Printf("DEBUG: updated parent title of %v to “%v”", document.Number, title)
+					title = foundTitle
+				}
+			}
+			shortTitle := findShortTitle(document.Title, title)
+			if title != "" || shortTitle != "" {
+				if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
+					bson.D{{"$set", bson.M{"parentTitle": title, "shortTitle": shortTitle}}}); err != nil {
+					logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
+				} else {
+					if result.UpsertedCount+result.MatchedCount != 1 {
+						logger.Println("ERROR: parent title was not written properly to MongoDB:",
+							result)
+					} else {
+						logger.Printf("DEBUG: updated parent title of %v to “%v”",
+							document.Number, title)
+					}
 				}
 			}
 		}
