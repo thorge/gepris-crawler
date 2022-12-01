@@ -182,7 +182,7 @@ type grantDocument struct {
 }
 
 var sfbRegexp = regexp.MustCompile(`^SFB ([0-9]+)`)
-var subProjectRegexp = regexp.MustCompile(`\s+\(([^)]*)\)$`)
+var subProjectRegexp = regexp.MustCompile(`\s+\(([^)]*?)[*#]*\)$`)
 var grkRegexp = regexp.MustCompile(`^(GRK [0-9]+)`)
 
 // findShortTitle uses heuristics to return a good abbreviated title for the
