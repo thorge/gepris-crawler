@@ -189,16 +189,16 @@ var grkRegexp = regexp.MustCompile(`^(GRK [0-9]+)`)
 // given project.  If none can be reliably created, en empty string is
 // returned.  Currently, SFB sub-projects (not the parent project, because they
 // should not not appear in selection lists) and GRKs are abbreviated.
-func findShortTitle(title, parentTitle string) string {
-	if parentMatches := sfbRegexp.FindStringSubmatch(parentTitle); parentMatches != nil {
-		if matches := subProjectRegexp.FindStringSubmatch(title); matches != nil {
+func findShortTitle(doc grantDocument) string {
+	if parentMatches := sfbRegexp.FindStringSubmatch(doc.ParentTitle); parentMatches != nil {
+		if matches := subProjectRegexp.FindStringSubmatch(doc.Title); matches != nil {
 			return fmt.Sprintf("SFB %v %v", parentMatches[1], matches[1])
 		}
 	}
-	if matches := grkRegexp.FindStringSubmatch(title); matches != nil {
+	if matches := grkRegexp.FindStringSubmatch(doc.Title); matches != nil {
 		return matches[1]
 	}
-	return ""
+	return fmt.Sprintf(fmt.Sprintf("DFG project %v", doc.Number))
 }
 
 // updateParentTitles walks through all projects in the MongoDB database and
@@ -240,7 +240,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 					title = foundTitle
 				}
 			}
-			shortTitle := findShortTitle(document.Title, title)
+			shortTitle := findShortTitle(document)
 			if title != "" || shortTitle != "" {
 				if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
 					bson.D{{"$set", bson.M{"parentTitle": title, "shortTitle": shortTitle}}}); err != nil {
