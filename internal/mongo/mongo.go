@@ -34,9 +34,8 @@ func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, err
 		return nil, nil, err
 	} else {
 		coll := client.Database("gepris").Collection("projects")
-		name, err := coll.Indexes().CreateOne(ctx, indexModel)
+		_, err := coll.Indexes().CreateOne(ctx, indexModel)
 		check(err)
-		Logger.Printf("INFO: Created index %v", name)
 		return client, coll, nil
 	}
 }
