@@ -17,6 +17,10 @@ var indexModel = mongo.IndexModel{
 	Keys: bson.D{{"number", 1}},
 }
 
+var indexTokenModel = mongo.IndexModel{
+	Keys: bson.D{{"token", 1}},
+}
+
 var mongoURI string
 
 func init() {
@@ -38,6 +42,14 @@ func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, err
 		check(err)
 		return client, coll, nil
 	}
+}
+
+// GetTokenColl returns the resumption tokens collection.  It also creates
+// (idempotently) the index on the “tokens” field in that collection.
+func GetTokenColl(ctx context.Context, client *mongo.Client) (coll *mongo.Collection, err error) {
+	coll = client.Database("gepris").Collection("tokens")
+	_, err = coll.Indexes().CreateOne(ctx, indexTokenModel)
+	return
 }
 
 func UpdateLastModificationTimestamp(update bson.M) {
