@@ -306,7 +306,7 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 				logger.Println("DEBUG: project has changed")
 			}
 			filter, update := project.updateMongo()
-			mongo.UpdateLastModificationTimestamp(update)
+			update["lastModification"] = time.Now()
 			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
 			check(err)
 			if result.UpsertedCount+result.ModifiedCount != 1 {

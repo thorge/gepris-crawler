@@ -3,10 +3,8 @@ package mongo
 import (
 	"context"
 	"os"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -50,8 +48,4 @@ func GetTokenColl(ctx context.Context, client *mongo.Client) (coll *mongo.Collec
 	coll = client.Database("gepris").Collection("tokens")
 	_, err = coll.Indexes().CreateOne(ctx, indexTokenModel)
 	return
-}
-
-func UpdateLastModificationTimestamp(update bson.M) {
-	update["lastModification"] = primitive.NewDateTimeFromTime(time.Now())
 }
