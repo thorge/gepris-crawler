@@ -347,7 +347,7 @@ func (project projectUmbrella) isDifferent(oldProject map[string]any) bool {
 
 // equal returns whether the given slices of strings are equal, i.e. have the
 // same length and have identical items at each position.  “b” is expected to
-// be a bson.A array (or nil, which is consideres an empty array).
+// be a bson.A array (or nil, which is considered an empty array).
 func equal(a []string, b any) bool {
 	if b == nil {
 		return len(a) == 0
