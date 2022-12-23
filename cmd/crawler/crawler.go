@@ -243,7 +243,8 @@ func updateParentTitles(coll *mongodb.Collection) {
 			shortTitle := findShortTitle(document)
 			if title != "" || shortTitle != "" {
 				if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
-					bson.D{{"$set", bson.M{"parentTitle": title, "shortTitle": shortTitle}}}); err != nil {
+					bson.D{{"$set", bson.M{"parentTitle": title, "shortTitle": shortTitle,
+						"lastModification": time.Now()}}}); err != nil {
 					logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
 				} else {
 					if result.UpsertedCount+result.MatchedCount != 1 {
