@@ -213,37 +213,37 @@ func updateParentTitles(coll *mongodb.Collection) {
 		logger.Panic("could not access MongoDB")
 	} else {
 		defer func() { err := cursor.Close(context.Background()); check(err) }()
-		titles := make(map[string]string)
+		parentTitles := make(map[string]string)
 		for cursor.Next(context.Background()) {
 			var document grantDocument
 			if err := cursor.Decode(&document); err != nil {
 				logger.Panicf("invalid record in MongoDB: %v", err)
 			}
-			titles[document.Number] = document.Title
-			var title string
+			parentTitles[document.Number] = document.Title
+			var parentTitle string
 			if document.Parent != "" {
-				if foundTitle, ok := titles[document.Parent]; !ok {
+				if foundTitle, ok := parentTitles[document.Parent]; !ok {
 					var parentDocument grantDocument
 					if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
 						Decode(&parentDocument); err != nil {
 						logger.Printf("ERROR: MongoDB result invalid for %v: %v",
 							document.Parent, err)
 					} else {
-						title = parentDocument.Title
-						if title == "" {
+						parentTitle = parentDocument.Title
+						if parentTitle == "" {
 							logger.Printf("ERROR: no title of %v found", document.Parent)
 							continue
 						}
-						titles[parentDocument.Number] = parentDocument.Title
+						parentTitles[parentDocument.Number] = parentDocument.Title
 					}
 				} else {
-					title = foundTitle
+					parentTitle = foundTitle
 				}
 			}
 			shortTitle := findShortTitle(document)
-			if title != "" || shortTitle != "" {
+			if parentTitle != "" || shortTitle != "" {
 				if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
-					bson.D{{"$set", bson.M{"parentTitle": title, "shortTitle": shortTitle,
+					bson.D{{"$set", bson.M{"parentTitle": parentTitle, "shortTitle": shortTitle,
 						"lastModification": time.Now()}}}); err != nil {
 					logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
 				} else {
@@ -252,7 +252,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 							result)
 					} else {
 						logger.Printf("DEBUG: updated parent title of %v to “%v”",
-							document.Number, title)
+							document.Number, parentTitle)
 					}
 				}
 			}
