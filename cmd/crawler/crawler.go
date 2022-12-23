@@ -177,6 +177,7 @@ func getYears() []int {
 type grantDocument struct {
 	Number      string
 	Title       string
+	ShortTitle  string
 	Parent      string
 	ParentTitle string
 }
@@ -241,18 +242,24 @@ func updateParentTitles(coll *mongodb.Collection) {
 				}
 			}
 			shortTitle := findShortTitle(document)
-			if parentTitle != "" || shortTitle != "" {
+			if parentTitle != document.ParentTitle || shortTitle != document.ShortTitle {
 				if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
 					bson.D{{"$set", bson.M{"parentTitle": parentTitle, "shortTitle": shortTitle,
 						"lastModification": time.Now()}}}); err != nil {
 					logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
 				} else {
 					if result.UpsertedCount+result.MatchedCount != 1 {
-						logger.Println("ERROR: parent title was not written properly to MongoDB:",
-							result)
+						logger.Println("ERROR: parent title / short title "+
+							"was not written properly to MongoDB:", result)
 					} else {
-						logger.Printf("DEBUG: updated parent title of %v to “%v”",
-							document.Number, parentTitle)
+						if parentTitle != document.ParentTitle {
+							logger.Printf("DEBUG: updated parent title of %v to “%v”",
+								document.Number, parentTitle)
+						}
+						if shortTitle != document.ShortTitle {
+							logger.Printf("DEBUG: updated short title of %v to “%v”",
+								document.Number, shortTitle)
+						}
 					}
 				}
 			}
