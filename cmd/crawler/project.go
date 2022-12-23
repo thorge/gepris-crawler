@@ -112,7 +112,6 @@ func (project projectBase) isDifferent(oldProject map[string]any) bool {
 		logger.Panic("comparison with project with different project number does not make sense")
 	}
 	return project.title != oldProject["title"].(string) ||
-		project.shortTitle != oldProject["shortTitle"].(string) ||
 		project.process != oldProject["process"].(string) ||
 		project.startYear != int(oldProject["startYear"].(int32)) ||
 		project.endYear != int(oldProject["endYear"].(int32)) ||
