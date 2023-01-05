@@ -199,7 +199,7 @@ func findShortTitle(doc grantDocument) string {
 	if matches := grkRegexp.FindStringSubmatch(doc.Title); matches != nil {
 		return matches[1]
 	}
-	return fmt.Sprintf(fmt.Sprintf("DFG project %v", doc.Number))
+	return fmt.Sprintf("DFG project %v", doc.Number)
 }
 
 // updateParentTitles walks through all projects in the MongoDB database and
