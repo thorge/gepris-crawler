@@ -187,7 +187,7 @@ var subProjectRegexp = regexp.MustCompile(`\s+\(([^)]*?)[*#]*\)$`)
 var grkRegexp = regexp.MustCompile(`^(GRK [0-9]+)`)
 
 // findShortTitle uses heuristics to return a good abbreviated title for the
-// given project.  If none can be reliably created, en empty string is
+// given project.  If none can be reliably created, an empty string is
 // returned.  Currently, SFB sub-projects (not the parent project, because they
 // should not not appear in selection lists) and GRKs are abbreviated.
 func findShortTitle(doc grantDocument) string {
