@@ -40,6 +40,10 @@ func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, err
 		coll := client.Database("gepris").Collection("projects")
 		_, err := coll.Indexes().CreateOne(ctx, indexModel)
 		check(err)
+		for _, fieldName := range []string{"endYear", "lastModification"} {
+			_, err = coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{fieldName, 1}}})
+			check(err)
+		}
 		return client, coll, nil
 	}
 }
