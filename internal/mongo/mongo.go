@@ -12,11 +12,13 @@ import (
 var MongoOpts = options.Replace().SetUpsert(true)
 
 var indexModel = mongo.IndexModel{
-	Keys: bson.D{{"number", 1}},
+	Keys:    bson.D{{"number", 1}},
+	Options: options.Index().SetUnique(true),
 }
 
 var indexTokenModel = mongo.IndexModel{
-	Keys: bson.D{{"token", 1}},
+	Keys:    bson.D{{"token", 1}},
+	Options: options.Index().SetUnique(true),
 }
 
 var mongoURI string
