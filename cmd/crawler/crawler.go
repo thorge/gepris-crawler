@@ -263,12 +263,12 @@ func updateParentTitles(coll *mongodb.Collection) {
 							"was not written properly to MongoDB:", result)
 					} else {
 						if parentTitle != document.ParentTitle {
-							logger.Printf("DEBUG: updated parent title of %v to “%v”",
-								document.Number, parentTitle)
+							logger.Printf("DEBUG: updated parent title of %v from “%v” to “%v”",
+								document.Number, document.ParentTitle, parentTitle)
 						}
 						if shortTitle != document.ShortTitle {
-							logger.Printf("DEBUG: updated short title of %v to “%v”",
-								document.Number, shortTitle)
+							logger.Printf("DEBUG: updated short title of %v from “%v” to “%v”",
+								document.Number, document.ShortTitle, shortTitle)
 						}
 					}
 				}
