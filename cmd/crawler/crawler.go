@@ -224,16 +224,16 @@ func updateParentTitles(coll *mongodb.Collection) {
 		logger.Panic("could not access MongoDB")
 	} else {
 		defer func() { err := cursor.Close(context.Background()); check(err) }()
-		parentTitles := make(map[string]string)
+		titles := make(map[string]string)
 		for cursor.Next(context.Background()) {
 			var document grantDocument
 			if err := cursor.Decode(&document); err != nil {
 				logger.Panicf("invalid record in MongoDB: %v", err)
 			}
-			parentTitles[document.Number] = document.Title
+			titles[document.Number] = document.Title
 			var parentTitle string
 			if document.Parent != "" {
-				if foundTitle, ok := parentTitles[document.Parent]; !ok {
+				if foundParentTitle, ok := titles[document.Parent]; !ok {
 					var parentDocument grantDocument
 					if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
 						Decode(&parentDocument); err != nil {
@@ -245,10 +245,10 @@ func updateParentTitles(coll *mongodb.Collection) {
 							logger.Printf("ERROR: no title of %v found", document.Parent)
 							continue
 						}
-						parentTitles[parentDocument.Number] = parentDocument.Title
+						titles[parentDocument.Number] = parentDocument.Title
 					}
 				} else {
-					parentTitle = foundTitle
+					parentTitle = foundParentTitle
 				}
 			}
 			shortTitle := findShortTitle(document)
