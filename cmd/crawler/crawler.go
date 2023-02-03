@@ -121,7 +121,7 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 	url := fmt.Sprintf("https://gepris.dfg.de/gepris/OCTOPUS?context=projekt&findButton=historyCall&"+
 		fundedIn+"hitsPerPage=%v&index=%v&task=doKatalog", resultsPerPage, index)
 	var body string
-	filename := fmt.Sprintf("search-results/%v_50.html", index)
+	filename := fmt.Sprintf("search-results/%v_%v_%v.html", year, index, resultsPerPage)
 	if cachePages {
 		if bodyRaw, err := os.ReadFile(filename); err == nil {
 			logger.Printf("INFO: Could take search results from cache")
