@@ -73,8 +73,9 @@ var cachePages = os.Getenv("CRAWLER_DEBUG") == "1"
 func processProject(projectNumber string) (result projecter, err error) {
 	url := fmt.Sprintf("https://gepris.dfg.de/gepris/projekt/%v", projectNumber)
 	var body string
+	filename := fmt.Sprintf("project-pages/%v.html", projectNumber)
 	if cachePages {
-		if bodyRaw, err := os.ReadFile(fmt.Sprintf("project-pages/%v.html", projectNumber)); err == nil {
+		if bodyRaw, err := os.ReadFile(filename); err == nil {
 			logger.Printf("INFO: Could take page from cache")
 			body = string(bodyRaw)
 		}
@@ -84,7 +85,7 @@ func processProject(projectNumber string) (result projecter, err error) {
 			return nil, err
 		}
 		if cachePages {
-			err = os.WriteFile(fmt.Sprintf("project-pages/%v.html", projectNumber), []byte(body), 0666)
+			err = os.WriteFile(filename, []byte(body), 0666)
 			check(err)
 		}
 	}
