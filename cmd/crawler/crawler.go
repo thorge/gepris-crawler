@@ -322,19 +322,19 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 		}
 		if oldProject == nil || project.isDifferent(oldProject) {
 			if oldProject == nil {
-				logger.Println("DEBUG: project is new")
+				logger.Printf("DEBUG: project %v is new", project.getNumber())
 			} else {
-				logger.Println("DEBUG: project has changed")
+				logger.Printf("DEBUG: project %v has changed", project.getNumber())
 			}
 			filter, update := project.updateMongo()
 			update["lastModification"] = time.Now()
 			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
 			check(err)
 			if result.UpsertedCount+result.ModifiedCount != 1 {
-				logger.Println("ERROR: project was not written properly to MongoDB")
+				logger.Printf("ERROR: project %v was not written properly to MongoDB", project.getNumber())
 			}
 		} else {
-			logger.Println("DEBUG: project is unchanged")
+			logger.Printf("DEBUG: project %v is unchanged", project.getNumber())
 		}
 	}
 }
