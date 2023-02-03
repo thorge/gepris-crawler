@@ -231,7 +231,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 				logger.Panicf("invalid record in MongoDB: %v", err)
 			}
 			titles[document.Number] = document.Title
-			var parentTitle string
+			oldParentTitle := document.ParentTitle
 			if document.Parent != "" {
 				if foundParentTitle, ok := titles[document.Parent]; !ok {
 					var parentDocument grantDocument
@@ -240,21 +240,24 @@ func updateParentTitles(coll *mongodb.Collection) {
 						logger.Printf("ERROR: MongoDB result invalid for %v: %v",
 							document.Parent, err)
 					} else {
-						parentTitle = parentDocument.Title
-						if parentTitle == "" {
+						document.ParentTitle = parentDocument.Title
+						if document.ParentTitle == "" {
 							logger.Printf("ERROR: no title of %v found", document.Parent)
 							continue
 						}
 						titles[parentDocument.Number] = parentDocument.Title
 					}
 				} else {
-					parentTitle = foundParentTitle
+					document.ParentTitle = foundParentTitle
 				}
 			}
-			shortTitle := findShortTitle(document)
-			if parentTitle != document.ParentTitle || shortTitle != document.ShortTitle {
+			oldShortTitle := document.ShortTitle
+			document.ShortTitle = findShortTitle(document)
+			if oldParentTitle != document.ParentTitle || oldShortTitle != document.ShortTitle {
 				if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
-					bson.D{{"$set", bson.M{"parentTitle": parentTitle, "shortTitle": shortTitle,
+					bson.D{{"$set", bson.M{
+						"parentTitle":      document.ParentTitle,
+						"shortTitle":       document.ShortTitle,
 						"lastModification": time.Now()}}}); err != nil {
 					logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
 				} else {
@@ -262,13 +265,13 @@ func updateParentTitles(coll *mongodb.Collection) {
 						logger.Println("ERROR: parent title / short title "+
 							"was not written properly to MongoDB:", result)
 					} else {
-						if parentTitle != document.ParentTitle {
+						if oldParentTitle != document.ParentTitle {
 							logger.Printf("DEBUG: updated parent title of %v from “%v” to “%v”",
-								document.Number, document.ParentTitle, parentTitle)
+								document.Number, oldParentTitle, document.ParentTitle)
 						}
-						if shortTitle != document.ShortTitle {
+						if oldShortTitle != document.ShortTitle {
 							logger.Printf("DEBUG: updated short title of %v from “%v” to “%v”",
-								document.Number, document.ShortTitle, shortTitle)
+								document.Number, oldShortTitle, document.ShortTitle)
 						}
 					}
 				}
