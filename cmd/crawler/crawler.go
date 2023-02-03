@@ -121,15 +121,21 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 		fundedIn+"hitsPerPage=%v&index=%v&task=doKatalog", resultsPerPage, index)
 	var body string
 	filename := fmt.Sprintf("search-results/%v_50.html", index)
-	if bodyRaw, err := os.ReadFile(filename); err != nil {
+	if cachePages {
+		if bodyRaw, err := os.ReadFile(filename); err == nil {
+			logger.Printf("INFO: Could take search results from cache")
+			body = string(bodyRaw)
+		}
+	}
+	if body == "" {
+		var err error
 		if body, err = fetchPage(url); err != nil {
 			return err
 		}
-		err = os.WriteFile(filename, []byte(body), 0666)
-		check(err)
-	} else {
-		logger.Printf("INFO: Could take search results from cache")
-		body = string(bodyRaw)
+		if cachePages {
+			err = os.WriteFile(filename, []byte(body), 0666)
+			check(err)
+		}
 	}
 	if doc, err := getDocument(body); err != nil {
 		return err
