@@ -171,10 +171,13 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 // projects should be found, it returns a single 0.
 func getYears() []int {
 	if os.Getenv("CRAWLER_FULL") == "1" {
+		logger.Printf("INFO: Will crawl all years")
 		return []int{0}
 	} else {
 		currentYear := time.Now().Year()
-		return []int{currentYear - 1, currentYear}
+		years := []int{currentYear - 1, currentYear}
+		logger.Printf("INFO: Will crawl only the years %v", years)
+		return years
 	}
 }
 
