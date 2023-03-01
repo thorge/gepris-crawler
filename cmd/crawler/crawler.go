@@ -277,6 +277,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 				}
 			}
 		}
+		check(cursor.Err())
 	}
 	logger.Println("INFO: finished updating all parent project titles")
 }
