@@ -5,6 +5,7 @@ import (
 	"regexp"
 
 	"github.com/PuerkitoBio/goquery"
+	tbr_errors "gitlab.com/bronger/tools/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/exp/slices"
 )
@@ -53,7 +54,7 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 		return fmt.Errorf("project has no title")
 	}
 	project.process, err = getField(doc.Find(`span.name`).FilterFunction(filterByRegexp(processRegexp)).Next())
-	check(err)
+	tbr_errors.ExitOnExpectedError(err, "HTML document from GEPRIS has unexpected format", 10)
 	if project.process == "" {
 		return fmt.Errorf("project has no DFG process")
 	}
@@ -70,9 +71,9 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 		logger.Println("WARNING: project has no discipline")
 	}
 	project.startYear, project.endYear, err = parseTimespan(doc)
-	check(err)
+	tbr_errors.ExitOnExpectedError(err, "HTML document from GEPRIS has unexpected format", 10)
 	project.description, err = getField(doc.Find("div#projekttext"))
-	check(err)
+	tbr_errors.ExitOnExpectedError(err, "HTML document from GEPRIS has unexpected format", 10)
 	if project.description == "" {
 		return fmt.Errorf("project has no description (not even empty)")
 	} else if project.description == "Keine Zusammenfassung vorhanden" {

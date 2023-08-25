@@ -27,7 +27,9 @@ func fetchPage(url string) (string, error) {
 		resp, err := client.Get(url)
 		if err == nil {
 			bodyRaw, err := io.ReadAll(resp.Body)
-			check(err)
+			if err != nil {
+				return "", err
+			}
 			must.Close(resp.Body)
 			body = string(bodyRaw)
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -81,6 +83,8 @@ func init() {
 		MaxIdleConnsPerHost: numberProjectWorkers + 1,
 	}
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	check(err)
+	if err != nil {
+		panic(err)
+	}
 	client = http.Client{Transport: transport, Jar: jar}
 }

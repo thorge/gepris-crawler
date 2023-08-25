@@ -38,11 +38,13 @@ func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, err
 		return nil, nil, err
 	} else {
 		coll := client.Database("gepris").Collection("projects")
-		_, err := coll.Indexes().CreateOne(ctx, indexModel)
-		check(err)
+		if _, err := coll.Indexes().CreateOne(ctx, indexModel); err != nil {
+			return nil, nil, err
+		}
 		for _, fieldName := range []string{"endYear", "lastModification"} {
-			_, err = coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{fieldName, 1}}})
-			check(err)
+			if _, err = coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{fieldName, 1}}}); err != nil {
+				return nil, nil, err
+			}
 		}
 		return client, coll, nil
 	}

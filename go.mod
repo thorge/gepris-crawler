@@ -7,6 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/google/uuid v1.3.0
 	github.com/klauspost/pgzip v1.2.5
+	gitlab.com/bronger/tools v0.0.0-20230706112208-a00fc48bafd7
 	go.mongodb.org/mongo-driver v1.10.2
 	go4.org v0.0.0-20201209231011-d4a079459e60
 	golang.org/x/exp v0.0.0-20221006183845-316c7553db56

@@ -18,19 +18,11 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	tbr_errors "gitlab.com/bronger/tools/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	mongodb "go.mongodb.org/mongo-driver/mongo"
 	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/mongo"
 )
-
-// check panics if its argument is non-nil.  It marks locations that should be
-// re-visited for possibly better error management.  If it is clear that a
-// panic is the only appropriate reaction, this function should not be used.
-func check(e error) {
-	if e != nil {
-		logger.Panicln("FATAL:", e)
-	}
-}
 
 // setupLogging sets up logging into a file.  The file is called
 // “gepris-crawler.log”, and the directory is taken from the environment
@@ -86,11 +78,11 @@ func processProject(projectNumber string) (result projecter, err error) {
 		}
 		if cachePages {
 			err = os.WriteFile(filename, []byte(body), 0666)
-			check(err)
+			tbr_errors.ExitOnExpectedError(err, "Could not write file", 10, "filename", filename)
 		}
 	}
 	doc, err := getDocument(body)
-	check(err)
+	tbr_errors.ExitOnExpectedError(err, "Could not parse HTML", 10, "body", body)
 	if doc.Find("h2.facelift").FilterFunction(filterByRegexp(subProjectListRegex)).Length() > 0 {
 		result = &projectUmbrella{projectBase: projectBase{number: projectNumber}}
 	} else if doc.Find(`span.name:contains("Antragstellende Institution")`).Length() > 0 {
@@ -135,7 +127,7 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 		}
 		if cachePages {
 			err = os.WriteFile(filename, []byte(body), 0666)
-			check(err)
+			tbr_errors.ExitOnExpectedError(err, "Could not write file", 10, "filename", filename)
 		}
 	}
 	if doc, err := getDocument(body); err != nil {
@@ -276,7 +268,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 				}
 			}
 		}
-		check(cursor.Err())
+		tbr_errors.ExitOnExpectedError(cursor.Err(), "Could not iterate though MongoDB documents", 10)
 	}
 	logger.Println("INFO: finished updating all parent project titles")
 }
@@ -329,7 +321,7 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 			filter, update := project.updateMongo()
 			update["lastModification"] = time.Now()
 			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
-			check(err)
+			tbr_errors.ExitOnExpectedError(err, "MongoDB error when replacing document", 10)
 			if result.UpsertedCount+result.ModifiedCount != 1 {
 				logger.Printf("ERROR: project %v was not written properly to MongoDB", project.getNumber())
 			}
@@ -355,8 +347,11 @@ func main() {
 		var mongoClient *mongodb.Client
 		var err error
 		mongoClient, coll, err = mongo.InitializeMongo(context.Background())
-		check(err)
-		defer func() { err := mongoClient.Disconnect(context.Background()); check(err) }()
+		tbr_errors.ExitOnExpectedError(err, "Could not initialise connection to MongoDB", 10)
+		defer func() {
+			err := mongoClient.Disconnect(context.Background())
+			tbr_errors.ExitOnExpectedError(err, "Could not disconnect from MongoDB", 10)
+		}()
 	}
 
 	var projectWorkersWaitGroup sync.WaitGroup
