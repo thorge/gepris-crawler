@@ -10,7 +10,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,32 +20,27 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	tbr_errors "gitlab.com/bronger/tools/errors"
+	tbr_logging "gitlab.com/bronger/tools/logging"
 	"go.mongodb.org/mongo-driver/bson"
 	mongodb "go.mongodb.org/mongo-driver/mongo"
 	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/mongo"
 )
 
-// setupLogging sets up logging into a file.  The file is called
-// “gepris-crawler.log”, and the directory is taken from the environment
-// variable GEPRIS_CRAWLER_LOG_PATH.  If this is not set, Go’s default logger
-// ist used.
-func setupLogging() *log.Logger {
+// init sets up logging into a file.  The file is called “gepris-crawler.log”,
+// and the directory is taken from the environment variable
+// GEPRIS_CRAWLER_LOG_PATH.  If this is not set, Go’s default logger ist used.
+func init() {
+	var logfile io.Writer
 	logPath := os.Getenv("GEPRIS_CRAWLER_LOG_PATH")
 	if logPath == "" {
-		return log.Default()
+		logfile = os.Stderr
+	} else {
+		logFilename := filepath.Join(logPath, "gepris-crawler.log")
+		var err error
+		logfile, err = os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		tbr_errors.ExitOnExpectedError(err, "Could not open logfile", 10, "path", logFilename)
 	}
-	logFilename := filepath.Join(logPath, "gepris-crawler.log")
-	logfile, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Panic(err)
-	}
-	return log.New(logfile, "", log.Lshortfile|log.LstdFlags)
-}
-
-var logger = setupLogging()
-
-func init() {
-	mongo.Logger = logger
+	tbr_logging.Init(logfile, slog.LevelDebug)
 }
 
 const (
@@ -68,12 +64,12 @@ func processProject(projectNumber string) (result projecter, err error) {
 	filename := fmt.Sprintf("project-pages/%v.html", projectNumber)
 	if cachePages {
 		if bodyRaw, err := os.ReadFile(filename); err == nil {
-			logger.Printf("INFO: Could take page from cache")
+			slog.Info("Could take page from cache")
 			body = string(bodyRaw)
 		}
 	}
 	if body == "" {
-		if body, err = fetchPage(url); err != nil {
+		if body, err = fetchPage(slog.Default(), url); err != nil {
 			return nil, err
 		}
 		if cachePages {
@@ -90,7 +86,7 @@ func processProject(projectNumber string) (result projecter, err error) {
 	} else {
 		result = &projectPerson{projectBase: projectBase{number: projectNumber}}
 	}
-	err = result.scanDocument(doc)
+	err = result.scanDocument(slog.Default(), doc)
 	return result, err
 }
 
@@ -116,13 +112,13 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 	filename := fmt.Sprintf("search-results/%v_%v_%v.html", year, index, resultsPerPage)
 	if cachePages {
 		if bodyRaw, err := os.ReadFile(filename); err == nil {
-			logger.Printf("INFO: Could take search results from cache")
+			slog.Info("Could take search results from cache")
 			body = string(bodyRaw)
 		}
 	}
 	if body == "" {
 		var err error
-		if body, err = fetchPage(url); err != nil {
+		if body, err = fetchPage(slog.Default(), url); err != nil {
 			return err
 		}
 		if cachePages {
@@ -163,12 +159,12 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 // projects should be found, it returns a single 0.
 func getYears() []int {
 	if os.Getenv("CRAWLER_FULL") == "1" {
-		logger.Printf("INFO: Will crawl all years")
+		slog.Info("Will crawl all years")
 		return []int{0}
 	} else {
 		currentYear := time.Now().Year()
 		years := []int{currentYear - 1, currentYear}
-		logger.Printf("INFO: Will crawl only the years %v", years)
+		slog.Info("Will crawl only certain years", "years", years)
 		return years
 	}
 }
@@ -211,15 +207,15 @@ func findShortTitle(doc grantDocument) string {
 // order to avoid having to query for them then, we use denormalisation by
 // adding the parent’s title here.
 func updateParentTitles(coll *mongodb.Collection) {
-	logger.Println("INFO: updating all parent project titles …")
+	slog.Info("updating all parent project titles …")
 	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
-		logger.Panic("could not access MongoDB")
+		tbr_errors.ExitWithExpectedError("Could not access MongoDB", 10)
 	} else {
 		titles := make(map[string]string)
 		for cursor.Next(context.Background()) {
 			var document grantDocument
 			if err := cursor.Decode(&document); err != nil {
-				logger.Panicf("invalid record in MongoDB: %v", err)
+				tbr_errors.ExitWithExpectedError("Invalid record in MongoDB", 10)
 			}
 			titles[document.Number] = document.Title
 			oldParentTitle := document.ParentTitle
@@ -228,12 +224,12 @@ func updateParentTitles(coll *mongodb.Collection) {
 					var parentDocument grantDocument
 					if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
 						Decode(&parentDocument); err != nil {
-						logger.Printf("ERROR: MongoDB result invalid for %v: %v",
-							document.Parent, err)
+						slog.Error("MongoDB result invalid",
+							"document", document.Parent, "error", err)
 					} else {
 						document.ParentTitle = parentDocument.Title
 						if document.ParentTitle == "" {
-							logger.Printf("ERROR: no title of %v found", document.Parent)
+							slog.Error("no title found", "document", document.Parent)
 							continue
 						}
 						titles[parentDocument.Number] = parentDocument.Title
@@ -250,19 +246,24 @@ func updateParentTitles(coll *mongodb.Collection) {
 						"parentTitle":      document.ParentTitle,
 						"shortTitle":       document.ShortTitle,
 						"lastModification": time.Now()}}}); err != nil {
-					logger.Panicf("MongoDB error while updating %v: %v", document.Number, err)
+					tbr_errors.ExitWithExpectedError("MongoDB error while updating", 10,
+						"document number", document.Number)
 				} else {
 					if result.UpsertedCount+result.MatchedCount != 1 {
-						logger.Println("ERROR: parent title / short title "+
-							"was not written properly to MongoDB:", result)
+						slog.Error("parent title / short title "+
+							"was not written properly to MongoDB", "result", result)
 					} else {
 						if oldParentTitle != document.ParentTitle {
-							logger.Printf("DEBUG: updated parent title of %v from “%v” to “%v”",
-								document.Number, oldParentTitle, document.ParentTitle)
+							slog.Debug("updated parent title",
+								"document number", document.Number,
+								"old parent title", oldParentTitle,
+								"new parent title", document.ParentTitle)
 						}
 						if oldShortTitle != document.ShortTitle {
-							logger.Printf("DEBUG: updated short title of %v from “%v” to “%v”",
-								document.Number, oldShortTitle, document.ShortTitle)
+							slog.Debug("updated short title",
+								"document number", document.Number,
+								"old short title", oldShortTitle,
+								"new short title", document.ShortTitle)
 						}
 					}
 				}
@@ -270,7 +271,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 		}
 		tbr_errors.ExitOnExpectedError(cursor.Err(), "Could not iterate though MongoDB documents", 10)
 	}
-	logger.Println("INFO: finished updating all parent project titles")
+	slog.Info("finished updating all parent project titles")
 }
 
 // processProjectNumbers is meant to run in multiple instances parallelly.  It
@@ -292,8 +293,9 @@ func processProjectNumbers(projectNumbers <-chan string, projects chan<- project
 		m.Unlock()
 		if !alreadyProcessed {
 			if project, err := processProject(projectNumber); err != nil {
-				logger.Printf("ERROR: While processing "+
-					"<https://gepris.dfg.de/gepris/projekt/%v>: %v", projectNumber, err)
+				slog.Error("Could not process project",
+					"url", fmt.Sprintf("https://gepris.dfg.de/gepris/projekt/%v", projectNumber),
+					"error", err)
 			} else {
 				projects <- project
 			}
@@ -310,23 +312,23 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 		var oldProject map[string]any
 		if err := coll.FindOne(context.Background(), bson.M{"number": project.getNumber()}).
 			Decode(&oldProject); err != nil && !errors.Is(err, mongodb.ErrNoDocuments) {
-			logger.Panic(err)
+			tbr_errors.ExitWithExpectedError("Could not retrieve document from MongoDB", 10)
 		}
 		if oldProject == nil || project.isDifferent(oldProject) {
 			if oldProject == nil {
-				logger.Printf("DEBUG: project %v is new", project.getNumber())
+				slog.Debug("project is new", "number", project.getNumber())
 			} else {
-				logger.Printf("DEBUG: project %v has changed", project.getNumber())
+				slog.Debug("project has changed", "number", project.getNumber())
 			}
 			filter, update := project.updateMongo()
 			update["lastModification"] = time.Now()
 			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
 			tbr_errors.ExitOnExpectedError(err, "MongoDB error when replacing document", 10)
 			if result.UpsertedCount+result.ModifiedCount != 1 {
-				logger.Printf("ERROR: project %v was not written properly to MongoDB", project.getNumber())
+				slog.Error("project was not written properly to MongoDB", "number", project.getNumber())
 			}
 		} else {
-			logger.Printf("DEBUG: project %v is unchanged", project.getNumber())
+			slog.Debug("project is unchanged", "number", project.getNumber())
 		}
 	}
 }
@@ -370,7 +372,7 @@ func main() {
 	go storeProjects(projects, coll, &projectStorageWaitGroup)
 
 	ctxTicker, cancelTicker := context.WithCancel(context.Background())
-	go enableTicker(ctxTicker)
+	go enableTicker(ctxTicker, slog.Default())
 	for _, year := range getYears() {
 		index := 0
 		for {
@@ -378,7 +380,7 @@ func main() {
 			if errors.Is(err, ErrNoFurtherResults) {
 				break
 			} else if err != nil {
-				logger.Println("ERROR:", err)
+				slog.Error("Could not get search results from GEPRIS", "error", err)
 			}
 			index += resultsPerPage
 		}

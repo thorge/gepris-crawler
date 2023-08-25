@@ -6,6 +6,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	tbr_errors "gitlab.com/bronger/tools/errors"
+	tbr_logging "gitlab.com/bronger/tools/logging"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/exp/slices"
 )
@@ -16,7 +17,7 @@ import (
 // abstraction is useful because GEPRIS projects fall into some categories with
 // different HTML parsing and datafield requirements.
 type projecter interface {
-	scanDocument(doc *goquery.Document) error
+	scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error
 	updateMongo() (bson.M, bson.M)
 	isDifferent(oldProject map[string]any) bool
 	getNumber() string
@@ -40,7 +41,7 @@ type projectBase struct {
 
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
-func (project *projectBase) scanDocument(doc *goquery.Document) error {
+func (project *projectBase) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
 	var err error
 	if project.title, err = getField(doc.Find("div.details > h1")); err != nil {
 		whitelist := []string{"61027617", "142091898", "221781256"}
@@ -62,13 +63,13 @@ func (project *projectBase) scanDocument(doc *goquery.Document) error {
 		return err
 	} else {
 		if parent != "" {
-			logger.Println("DEBUG: found parent project")
+			logger.Debug("Found parent project")
 			project.parent = parent
 		}
 	}
 	project.disciplines = parseDisciplines(doc)
 	if len(project.disciplines) == 0 {
-		logger.Println("WARNING: project has no discipline")
+		logger.Warn("Project has no discipline")
 	}
 	project.startYear, project.endYear, err = parseTimespan(doc)
 	tbr_errors.ExitOnExpectedError(err, "HTML document from GEPRIS has unexpected format", 10)
@@ -110,7 +111,7 @@ func (project projectBase) updateMongo() (bson.M, bson.M) {
 // types (person, institution, and umbrella).
 func (project projectBase) isDifferent(oldProject map[string]any) bool {
 	if project.number != oldProject["number"].(string) {
-		logger.Panic("comparison with project with different project number does not make sense")
+		panic("Comparison with project with different project number does not make sense")
 	}
 	return project.title != oldProject["title"].(string) ||
 		project.process != oldProject["process"].(string) ||
@@ -138,8 +139,8 @@ type projectPerson struct {
 
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
-func (project *projectPerson) scanDocument(doc *goquery.Document) error {
-	if err := project.projectBase.scanDocument(doc); err != nil {
+func (project *projectPerson) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
+	if err := project.projectBase.scanDocument(logger, doc); err != nil {
 		return err
 	}
 	if results := parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(applicantRegexp)).
@@ -147,7 +148,7 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 		whitelist := []string{"5336466", "5382838", "5395416", "5449328", "5449334", "5449348", "29528568",
 			"463409137", "495365311"}
 		if slices.Contains(whitelist, project.number) {
-			logger.Printf("DEBUG: ignoring missing applicant for white-listed project")
+			logger.Debug("Ignoring missing applicant for white-listed project")
 		} else {
 			return fmt.Errorf("no applicant found")
 		}
@@ -156,7 +157,7 @@ func (project *projectPerson) scanDocument(doc *goquery.Document) error {
 	}
 	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
-		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
+		logger.Debug("Found participating people", "number", len(project.partPeople))
 	}
 	return nil
 }
@@ -199,8 +200,8 @@ type projectInstitution struct {
 
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
-func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
-	if err := project.projectBase.scanDocument(doc); err != nil {
+func (project *projectInstitution) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
+	if err := project.projectBase.scanDocument(logger, doc); err != nil {
 		return err
 	}
 	if results := parseLinkList(
@@ -212,24 +213,24 @@ func (project *projectInstitution) scanDocument(doc *goquery.Document) error {
 	project.coInstitutions = parseLinkList(
 		doc.Find(`span.name`).FilterFunction(filterByRegexp(coInstitutionsRegexp)).Next())
 	if len(project.coInstitutions) != 0 {
-		logger.Printf("DEBUG: found %v co-applying institutions", len(project.coInstitutions))
+		logger.Debug("Found co-applying institutions", "number", len(project.coInstitutions))
 	}
 	project.partInstitutions = parseLinkList(
 		doc.Find(`span.name`).FilterFunction(filterByRegexp(partInstitutionsRegexp)).Next())
 	if len(project.partInstitutions) != 0 {
-		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
+		logger.Debug("Found participating institutions", "number", len(project.partInstitutions))
 	}
 	project.speakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next())
 	if len(project.speakers) == 0 {
-		logger.Printf("WARNING: no speaker found")
+		logger.Warn("No speaker found")
 	}
 	project.coSpeakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(coSpeakersRegexp)).Next())
 	if len(project.coSpeakers) != 0 {
-		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
+		logger.Debug("Found co-speakers", "number", len(project.coSpeakers))
 	}
 	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
-		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
+		logger.Debug("Found participating people", "number", len(project.partPeople))
 	}
 	return nil
 }
@@ -279,37 +280,37 @@ type projectUmbrella struct {
 
 // scanDocument fills the internal data fields of the project with the data
 // found in the given HTML document.
-func (project *projectUmbrella) scanDocument(doc *goquery.Document) error {
-	if err := project.projectBase.scanDocument(doc); err != nil {
+func (project *projectUmbrella) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
+	if err := project.projectBase.scanDocument(logger, doc); err != nil {
 		return err
 	}
 	if results := parseLinkList(
 		doc.Find(`span.name`).FilterFunction(filterByRegexp(institutionsRegexp)).Next()); len(results) == 0 {
-		logger.Println("DEBUG: no applying institution found")
+		logger.Debug("No applying institution found")
 	} else {
 		project.institutions = results
 	}
 	project.coInstitutions = parseLinkList(
 		doc.Find(`span.name`).FilterFunction(filterByRegexp(coInstitutionsRegexp)).Next())
 	if len(project.coInstitutions) != 0 {
-		logger.Printf("DEBUG: found %v co-applying institutions", len(project.coInstitutions))
+		logger.Debug("Found co-applying institutions", "number", len(project.coInstitutions))
 	}
 	project.partInstitutions = parseLinkList(
 		doc.Find(`span.name`).FilterFunction(filterByRegexp(partInstitutionsRegexp)).Next())
 	if len(project.partInstitutions) != 0 {
-		logger.Printf("DEBUG: found %v participating institutions", len(project.partInstitutions))
+		logger.Debug("Found participating institutions", "number", len(project.partInstitutions))
 	}
 	project.speakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next())
 	if len(project.speakers) == 0 {
-		logger.Printf("WARNING: no speaker found")
+		logger.Warn("No speaker found")
 	}
 	project.coSpeakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(coSpeakersRegexp)).Next())
 	if len(project.coSpeakers) != 0 {
-		logger.Printf("DEBUG: found %v co-speakers", len(project.coSpeakers))
+		logger.Debug("Found co-speakers", "number", len(project.coSpeakers))
 	}
 	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
-		logger.Printf("DEBUG: found %v participating people", len(project.partPeople))
+		logger.Debug("Found participating people", "number", len(project.partPeople))
 	}
 	return nil
 }

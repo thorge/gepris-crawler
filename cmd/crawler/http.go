@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"time"
 
+	tbr_logging "gitlab.com/bronger/tools/logging"
 	"go4.org/must"
 	"golang.org/x/net/publicsuffix"
 )
@@ -18,8 +20,8 @@ var client http.Client
 
 // fetchPage downloads the given URL end returns the HTML.  If the server
 // answers with a 5xx status, the request is retried up to triesLeft times.
-func fetchPage(url string) (string, error) {
-	logger.Printf("INFO: fetching %v", url)
+func fetchPage(logger tbr_logging.Logger, url string) (string, error) {
+	logger.Info("Fetching URL", "url", url)
 	var body string
 	triesLeft := triesLeft
 	for {
@@ -35,14 +37,14 @@ func fetchPage(url string) (string, error) {
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				break
 			} else {
-				logger.Printf("WARNING: The HTTP request for %v failed with status code %v: %v",
-					url, resp.StatusCode, body)
+				logger.Warn("The HTTP request failed",
+					"url", url, "status code", resp.StatusCode, "message", body)
 				if resp.StatusCode < 500 || resp.StatusCode >= 600 {
 					return "", fmt.Errorf("Giving up on %v.", url)
 				}
 			}
 		} else {
-			logger.Printf("WARNING: The HTTP request for %v failed without status code: %v", url, err)
+			logger.Warn("The HTTP request failed without status code", "url", url, "error", err)
 		}
 		triesLeft--
 		if triesLeft == 0 {
@@ -58,14 +60,14 @@ var ticker = make(chan time.Time, maxRequestsPerSec)
 // enableTitle must be run as a Go routine that may be cancelled by the given
 // context.  It fills the global variable “ticker” with events at a frequency
 // of maxRequestsPerSec.
-func enableTicker(ctx context.Context) {
+func enableTicker(ctx context.Context, logger tbr_logging.Logger) {
 	for t := range time.Tick(time.Second / maxRequestsPerSec) {
 		select {
 		case <-ctx.Done():
 			return
 		case ticker <- t:
 		default:
-			logger.Println("DEBUG: Workers slower than rate limiter")
+			logger.Debug("Workers slower than rate limiter")
 		}
 	}
 }
@@ -76,7 +78,7 @@ func init() {
 		// Dial is the original function, plus a line in the log.  This way,
 		// one can see how many HTTP connections are established.
 		Dial: func(network, addr string) (net.Conn, error) {
-			logger.Println("DEBUG: Dial!")
+			slog.Debug("Dial!")
 			return net.Dial(network, addr)
 		},
 		// “+ 1” for the connection for search results pages

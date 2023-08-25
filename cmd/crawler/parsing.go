@@ -53,7 +53,7 @@ func getField(s *goquery.Selection) (value string, err error) {
 func mustAtoi(s string) (i int) {
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		logger.Panicln("FATAL:", err)
+		panic(err)
 	}
 	return
 }
@@ -84,7 +84,7 @@ func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
 			end = mustAtoi(matches[2])
 		}
 	} else {
-		logger.Panicln("FATAL:", timespan, "could not be matched")
+		return 0, 0, fmt.Errorf("FATAL: %v could not be matched", timespan)
 	}
 	return
 }
