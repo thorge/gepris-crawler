@@ -1,6 +1,6 @@
 module jugit.fz-juelich.de/fdm/gepris-crawler
 
-go 1.18
+go 1.21.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
