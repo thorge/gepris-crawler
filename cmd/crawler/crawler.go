@@ -305,7 +305,7 @@ func processProjectNumbers(projectNumbers <-chan string, projects chan<- project
 
 // storeProjects reads projects from “projects” and writes them to MongoDB.  It
 // must not be run with multiple instances.  It reports back on the given wait
-// groups when it’s finished.
+// group when it’s finished.
 func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for project := range projects {
