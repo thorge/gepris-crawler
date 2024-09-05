@@ -4,10 +4,6 @@ go 1.21.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/go-chi/chi/v5 v5.0.10
-	github.com/go-chi/httplog/v2 v2.0.9
-	github.com/google/uuid v1.3.0
-	github.com/klauspost/pgzip v1.2.5
 	gitlab.com/bronger/tools v0.0.0-20230825105701-52687403a66d
 	go.mongodb.org/mongo-driver v1.10.2
 	go4.org v0.0.0-20201209231011-d4a079459e60
