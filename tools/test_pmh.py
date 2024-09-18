@@ -11,7 +11,7 @@ client = Client("https://gepris.its.kfa-juelich.de", registry)
 identifiers = set()
 for record in client.listRecords(metadataPrefix="oai_dc"):
     fields = record[1].getMap()
-    identifier = fields["identifier"][0]
+    identifier = record[0].identifier()
     identifiers.add(identifier)
-    print(identifier, fields["relation"], fields["creator"])
+    print(identifier, fields)
 print(len(identifiers))
