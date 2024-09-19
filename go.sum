@@ -282,6 +282,14 @@ honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
 jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240905152713-d84f61f4be4a h1:JMUnX75adSXLPEeH55ajrVajR4LpdjWyKLBcpHuw6Iw=
 jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240905152713-d84f61f4be4a/go.mod h1:sGo8BAsndZ3J2JhC6lsg8a5tcijlABg3+brpjcy011Y=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919133041-bc8e4b3c9586 h1:rLCCpt5w+tPJVlQvhkIB7/1wr43RnIjR0dVRsAyMwx0=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919133041-bc8e4b3c9586/go.mod h1:sGo8BAsndZ3J2JhC6lsg8a5tcijlABg3+brpjcy011Y=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919133543-8fbc211c15c3 h1:dA0JpABAeeS3QlxHn7vQx8aHMzrZIOCOBua8khbet7k=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919133543-8fbc211c15c3/go.mod h1:sGo8BAsndZ3J2JhC6lsg8a5tcijlABg3+brpjcy011Y=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919135222-7f08bb6aca83 h1:xGcHAhDrC4YAsZSqFXnmqO404M/ZIWANV1ajUYU0vRk=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919135222-7f08bb6aca83/go.mod h1:sGo8BAsndZ3J2JhC6lsg8a5tcijlABg3+brpjcy011Y=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919135541-6cea670fb19b h1:P7a3rlNTUGE1qWBuG6srqe5p8JFDzVOqrAAzasgs/YQ=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240919135541-6cea670fb19b/go.mod h1:sGo8BAsndZ3J2JhC6lsg8a5tcijlABg3+brpjcy011Y=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=

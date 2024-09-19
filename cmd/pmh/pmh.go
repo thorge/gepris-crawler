@@ -11,5 +11,15 @@ import (
 )
 
 func main() {
-	pmh.Serve()
+	pmh.Serve(pmh.Options{
+		DBName:              "gepris",
+		CollName:            "projects",
+		AddIndices:          []string{"endYear"},
+		Name:                "GEPRIS – project database of the Deutsche Forschungsgemeinschaft (DFG); UNOFFICIAL",
+		URL:                 "https://gepris.its.kfa-juelich.de",
+		AdminEmail:          "juser@fz-juelich.de",
+		BuildFunc:           buildGrant,
+		BuildDCFunc:         buildGrantDC,
+		BuildOnlyHeaderFunc: buildGrantOnlyHeader,
+	})
 }
