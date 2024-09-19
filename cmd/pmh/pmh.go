@@ -38,9 +38,6 @@ func init() {
 	if endYearRaw := os.Getenv("GEPRIS_PMH_SINCE_END_YEAR"); endYearRaw != "" {
 		var err error
 		if sinceEndYear, err = strconv.Atoi(endYearRaw); err != nil {
-			// FixMe: The whole function should be moved to the
-			// main package, and sinceEndYear becomes an argument
-			// for getIDs.
 			panic(err)
 		}
 	}
