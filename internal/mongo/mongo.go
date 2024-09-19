@@ -12,7 +12,7 @@ import (
 var MongoOpts = options.Replace().SetUpsert(true)
 
 var indexModel = mongo.IndexModel{
-	Keys:    bson.D{{"number", 1}},
+	Keys:    bson.D{{"identifier", 1}},
 	Options: options.Index().SetUnique(true),
 }
 
@@ -31,7 +31,7 @@ func init() {
 }
 
 // InitializeMongo makes the connection to the MongoDB, creates the database
-// “gepris” with the collection “projects” and the index for the “number”
+// “gepris” with the collection “projects” and the index for the “identifier”
 // field.  Everything of this that already exists is left as is.
 func InitializeMongo(ctx context.Context) (*mongo.Client, *mongo.Collection, error) {
 	if client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI)); err != nil {

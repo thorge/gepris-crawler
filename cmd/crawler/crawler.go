@@ -80,11 +80,11 @@ func processProject(projectNumber string) (result projecter, err error) {
 	doc, err := getDocument(body)
 	tbr_errors.ExitOnExpectedError(err, "Could not parse HTML", 10, "body", body)
 	if doc.Find("h2.facelift").FilterFunction(filterByRegexp(subProjectListRegex)).Length() > 0 {
-		result = &projectUmbrella{projectBase: projectBase{number: projectNumber}}
+		result = &projectUmbrella{projectBase: projectBase{identifier: "G:(GEPRIS)" + projectNumber}}
 	} else if doc.Find(`span.name:contains("Antragstellende Institution")`).Length() > 0 {
-		result = &projectInstitution{projectBase: projectBase{number: projectNumber}}
+		result = &projectInstitution{projectBase: projectBase{identifier: "G:(GEPRIS)" + projectNumber}}
 	} else {
-		result = &projectPerson{projectBase: projectBase{number: projectNumber}}
+		result = &projectPerson{projectBase: projectBase{identifier: "G:(GEPRIS)" + projectNumber}}
 	}
 	err = result.scanDocument(slog.Default(), doc)
 	return result, err
@@ -173,7 +173,7 @@ func getYears() []int {
 // Therefore, it contains only the subset of fields of grants that are needed
 // here.
 type grantDocument struct {
-	Number      string
+	Identifier  string
 	Title       string
 	ShortTitle  string
 	Parent      string
@@ -197,15 +197,15 @@ func findShortTitle(doc grantDocument) string {
 	if matches := grkRegexp.FindStringSubmatch(doc.Title); matches != nil {
 		return matches[1]
 	}
-	return fmt.Sprintf("DFG project %v", doc.Number)
+	return fmt.Sprintf("DFG project %v", doc.Identifier)
 }
 
 // updateParentTitles walks through all projects in the MongoDB database and
-// sets the parent titles according to the parent numbers.  When fetching the
-// projects from the GEPRIS, we only get the *number* of the parent project.
-// But when returning results in PMH requests, we also need the title.  In
-// order to avoid having to query for them then, we use denormalisation by
-// adding the parent’s title here.
+// sets the parent titles according to the parent identifiers.  When fetching
+// the projects from the GEPRIS, we only get the *identifier* of the parent
+// project.  But when returning results in PMH requests, we also need the
+// title.  In order to avoid having to query for them then, we use
+// denormalisation by adding the parent’s title here.
 func updateParentTitles(coll *mongodb.Collection) {
 	slog.Info("updating all parent project titles …")
 	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
@@ -217,12 +217,12 @@ func updateParentTitles(coll *mongodb.Collection) {
 			if err := cursor.Decode(&document); err != nil {
 				tbr_errors.ExitWithExpectedError("Invalid record in MongoDB", 10)
 			}
-			titles[document.Number] = document.Title
+			titles[document.Identifier] = document.Title
 			oldParentTitle := document.ParentTitle
 			if document.Parent != "" {
 				if foundParentTitle, ok := titles[document.Parent]; !ok {
 					var parentDocument grantDocument
-					if err := coll.FindOne(context.Background(), bson.D{{"number", document.Parent}}).
+					if err := coll.FindOne(context.Background(), bson.D{{"identifier", document.Parent}}).
 						Decode(&parentDocument); err != nil {
 						slog.Error("MongoDB result invalid",
 							"document", document.Parent, "error", err)
@@ -232,7 +232,7 @@ func updateParentTitles(coll *mongodb.Collection) {
 							slog.Error("no title found", "document", document.Parent)
 							continue
 						}
-						titles[parentDocument.Number] = parentDocument.Title
+						titles[parentDocument.Identifier] = parentDocument.Title
 					}
 				} else {
 					document.ParentTitle = foundParentTitle
@@ -241,13 +241,14 @@ func updateParentTitles(coll *mongodb.Collection) {
 			oldShortTitle := document.ShortTitle
 			document.ShortTitle = findShortTitle(document)
 			if oldParentTitle != document.ParentTitle || oldShortTitle != document.ShortTitle {
-				if result, err := coll.UpdateOne(context.Background(), bson.D{{"number", document.Number}},
+				if result, err := coll.UpdateOne(
+					context.Background(), bson.D{{"identifier", document.Identifier}},
 					bson.D{{"$set", bson.M{
 						"parentTitle":      document.ParentTitle,
 						"shortTitle":       document.ShortTitle,
 						"lastModification": time.Now()}}}); err != nil {
 					tbr_errors.ExitWithExpectedError("MongoDB error while updating", 10,
-						"document number", document.Number)
+						"document identifier", document.Identifier)
 				} else {
 					if result.UpsertedCount+result.MatchedCount != 1 {
 						slog.Error("parent title / short title "+
@@ -255,13 +256,13 @@ func updateParentTitles(coll *mongodb.Collection) {
 					} else {
 						if oldParentTitle != document.ParentTitle {
 							slog.Debug("updated parent title",
-								"document number", document.Number,
+								"document identifier", document.Identifier,
 								"old parent title", oldParentTitle,
 								"new parent title", document.ParentTitle)
 						}
 						if oldShortTitle != document.ShortTitle {
 							slog.Debug("updated short title",
-								"document number", document.Number,
+								"document identifier", document.Identifier,
 								"old short title", oldShortTitle,
 								"new short title", document.ShortTitle)
 						}
@@ -310,25 +311,26 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 	defer wg.Done()
 	for project := range projects {
 		var oldProject map[string]any
-		if err := coll.FindOne(context.Background(), bson.M{"number": project.getNumber()}).
+		if err := coll.FindOne(context.Background(), bson.M{"identifier": project.getIdentifier()}).
 			Decode(&oldProject); err != nil && !errors.Is(err, mongodb.ErrNoDocuments) {
 			tbr_errors.ExitWithExpectedError("Could not retrieve document from MongoDB", 10)
 		}
 		if oldProject == nil || project.isDifferent(oldProject) {
 			if oldProject == nil {
-				slog.Debug("project is new", "number", project.getNumber())
+				slog.Debug("project is new", "identifier", project.getIdentifier())
 			} else {
-				slog.Debug("project has changed", "number", project.getNumber())
+				slog.Debug("project has changed", "identifier", project.getIdentifier())
 			}
 			filter, update := project.updateMongo()
 			update["lastModification"] = time.Now()
 			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
 			tbr_errors.ExitOnExpectedError(err, "MongoDB error when replacing document", 10)
 			if result.UpsertedCount+result.ModifiedCount != 1 {
-				slog.Error("project was not written properly to MongoDB", "number", project.getNumber())
+				slog.Error("project was not written properly to MongoDB",
+					"identifier", project.getIdentifier())
 			}
 		} else {
-			slog.Debug("project is unchanged", "number", project.getNumber())
+			slog.Debug("project is unchanged", "identifier", project.getIdentifier())
 		}
 	}
 }

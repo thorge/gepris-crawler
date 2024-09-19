@@ -20,14 +20,14 @@ type projecter interface {
 	scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error
 	updateMongo() (bson.M, bson.M)
 	isDifferent(oldProject map[string]any) bool
-	getNumber() string
+	getIdentifier() string
 }
 
 // projectBase contains the data included in every DFG project.  This is an
-// abstract type that is only embedded into others.  It must have a number,
-// a title, and a process.
+// abstract type that is only embedded into others.  It must have an
+// identifier, a title, and a process.
 type projectBase struct {
-	number             string
+	identifier         string
 	title              string
 	shortTitle         string
 	process            string
@@ -44,9 +44,9 @@ type projectBase struct {
 func (project *projectBase) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
 	var err error
 	if project.title, err = getField(doc.Find("div.details > h1")); err != nil {
-		whitelist := []string{"61027617", "142091898", "221781256"}
-		if slices.Contains(whitelist, project.number) {
-			project.title = fmt.Sprintf("DFG project %v (no proper title known)", project.number)
+		whitelist := []string{"G:(GEPRIS)61027617", "G:(GEPRIS)142091898", "G:(GEPRIS)221781256"}
+		if slices.Contains(whitelist, project.identifier) {
+			project.title = fmt.Sprintf("DFG project %v (no proper title known)", project.identifier)
 		} else {
 			return err
 		}
@@ -86,9 +86,9 @@ func (project *projectBase) scanDocument(logger tbr_logging.Logger, doc *goquery
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
 func (project projectBase) updateMongo() (bson.M, bson.M) {
-	filter := bson.M{"number": project.number}
+	filter := bson.M{"identifier": project.identifier}
 	update := bson.M{
-		"number":      project.number,
+		"identifier":  project.identifier,
 		"title":       project.title,
 		"shortTitle":  project.shortTitle,
 		"process":     project.process,
@@ -110,8 +110,8 @@ func (project projectBase) updateMongo() (bson.M, bson.M) {
 // string → any because this is the lowest common denominator for all project
 // types (person, institution, and umbrella).
 func (project projectBase) isDifferent(oldProject map[string]any) bool {
-	if project.number != oldProject["number"].(string) {
-		panic("Comparison with project with different project number does not make sense")
+	if project.identifier != oldProject["identifier"].(string) {
+		panic("Comparison with project with different project identifier does not make sense")
 	}
 	return project.title != oldProject["title"].(string) ||
 		project.process != oldProject["process"].(string) ||
@@ -123,9 +123,9 @@ func (project projectBase) isDifferent(oldProject map[string]any) bool {
 		project.parent != oldProject["parent"].(string)
 }
 
-// getNumber returns the project number.
-func (project projectBase) getNumber() string {
-	return project.number
+// getIdentifier returns the project identifier.
+func (project projectBase) getIdentifier() string {
+	return project.identifier
 }
 
 // projectPerson contains the data of a project the applicant of which is a
@@ -147,7 +147,7 @@ func (project *projectPerson) scanDocument(logger tbr_logging.Logger, doc *goque
 		Next()); len(results) == 0 {
 		whitelist := []string{"5336466", "5382838", "5395416", "5449328", "5449334", "5449348", "29528568",
 			"463409137", "495365311"}
-		if slices.Contains(whitelist, project.number) {
+		if slices.Contains(whitelist, project.identifier) {
 			logger.Debug("Ignoring missing applicant for white-listed project")
 		} else {
 			return fmt.Errorf("no applicant found")
@@ -388,7 +388,7 @@ func parseLinkList(s *goquery.Selection) (elements []string) {
 
 var urlRegexp = regexp.MustCompile(`^/gepris/projekt/(\d+)$`)
 
-// getParent returns the project number of the parent project.  The “doc”
+// getParent returns the project identifier of the parent project.  The “doc”
 // argument contains the parsed HTML page for the project.  If it does not have
 // a parent, an empty string is returned.
 func getParent(doc *goquery.Document) (string, error) {
@@ -411,7 +411,7 @@ func getParent(doc *goquery.Document) (string, error) {
 	if match := urlRegexp.FindStringSubmatch(url); match == nil {
 		return "", fmt.Errorf("invalid URL found in “Teilprojekt zu”")
 	} else {
-		return match[1], nil
+		return "G:(GEPRIS)" + match[1], nil
 	}
 }
 

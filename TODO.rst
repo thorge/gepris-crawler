@@ -32,9 +32,9 @@ Things to improve
   consumption, response can start immediately.
 - When iterating over the MongoDB results, expiring of the context should be
   detected.
-- Instead of upserting in MongoDB using the project number as the filter, the
-  project number should be in the ``_id`` field.  Then, I don’t need the index
-  of “number” any more.  Moreover, it *may* be faster.
+- Instead of upserting in MongoDB using the project identifier as the filter,
+  the project identifier should be in the ``_id`` field.  Then, I don’t need
+  the index of “identifier” any more.  Moreover, it *may* be faster.
 - “Sprecher” (speaker) and “Leiter” (head) should be distinguished.  They are
   different at least for umbrella projects.
 - According to
