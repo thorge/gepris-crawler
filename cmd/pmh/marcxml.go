@@ -73,16 +73,6 @@ type subfield struct {
 	Content string   `xml:",chardata"`
 }
 
-// grantEntryOnlyHeader is a stripped-down <header> element (otherwise created
-// by the fields Identifier and Datestramp in grantEntry) that is used for the
-// PMH verb ListIdentifiers.  Its only purpose is to avoid the generation of
-// the <metadata> element.
-type grantEntryOnlyHeader struct {
-	XMLName    xml.Name `xml:"header"`
-	Identifier string   `xml:"identifier"`
-	Datestamp  string   `xml:"datestamp"`
-}
-
 // buildTimespan returns the years of funding of the given grant as an interval
 // ready to be used in MARCXML output (with “ - ” as sep) or Dublin Core (with
 // “/” as sep).  If no funding years are contained in the grant, an empty
@@ -106,21 +96,6 @@ func buildTimespan(doc grantDocument, sep string) string {
 		}
 	}
 	return sb.String()
-}
-
-// buildGrantOnlyHeader returns the datastructure marshalled to <header>
-// without <metadata>, to be used for the PMH verb ListIdentifiers.
-func buildGrantOnlyHeader(doc any) any {
-	var (
-		grantDoc grantDocument
-		entry    grantEntryOnlyHeader
-	)
-	if err := pmh.Convert(doc, &grantDoc); err != nil {
-		panic(err)
-	}
-	entry.Identifier = grantDoc.Identifier
-	entry.Datestamp = grantDoc.LastModification.In(time.UTC).Format(time.RFC3339)
-	return entry
 }
 
 // buildGrant creates one MARCXML record for the given grant.  Actually, it

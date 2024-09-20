@@ -26,9 +26,20 @@ func main() {
 			bson.D{{"endYear", bson.D{{"$gte", sinceEndYear}}}},
 			bson.D{{"endYear", bson.D{{"$eq", 0}}}},
 		}}},
-		BuildFunc:           buildGrant,
-		BuildDCFunc:         buildGrantDC,
-		BuildOnlyHeaderFunc: buildGrantOnlyHeader,
+		MetadataFormats: []pmh.MetadataFormat{
+			{
+				Prefix:    "oai_dc",
+				Schema:    "http://www.openarchives.org/OAI/2.0/oai_dc.xsd",
+				Namespace: "http://www.openarchives.org/OAI/2.0/oai_dc/",
+				BuildFunc: buildGrantDC,
+			},
+			{
+				Prefix:    "marcxml",
+				Schema:    "https://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd",
+				Namespace: "http://www.loc.gov/MARC21/slim",
+				BuildFunc: buildGrant,
+			},
+		},
 	})
 }
 
