@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"jugit.fz-juelich.de/fdm/pmh-server"
 )
 
 // grantEntry represents the top-level XML element in the PMH response.  In the
@@ -53,13 +51,13 @@ type subfield struct {
 // buildGrant creates one MARCXML record for the given grant.  Actually, it
 // returns a PMH <record> element, which contains slightly more than only the
 // MARCXML.
-func buildGrant(doc any) any {
+func buildGrant(decodeFunc func(any) error) (any, error) {
 	var (
 		grantDoc grantDocument
 		entry    grantEntry
 	)
-	if err := pmh.Convert(doc, &grantDoc); err != nil {
-		panic(err)
+	if err := decodeFunc(&grantDoc); err != nil {
+		return nil, err
 	}
 	geprisID := grantDoc.Identifier
 	entry.Identifier = geprisID
@@ -136,7 +134,7 @@ func buildGrant(doc any) any {
 		datafield{Tag: "680", Ind1: " ", Ind2: " ",
 			Subfields: []subfield{{Code: "a", Content: grantDoc.Description}}})
 	entry.Metadata.Record.Datafields = datafields
-	return entry
+	return entry, nil
 }
 
 // buildTimespan returns the years of funding of the given grant as an interval

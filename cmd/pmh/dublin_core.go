@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"jugit.fz-juelich.de/fdm/pmh-server"
 )
 
 // grantEntryDC is the Dublin-Code-counterpart to grantEntry.  For typing
@@ -42,13 +40,13 @@ type recordDC struct {
 // buildGrantDC generates a data structure ready to be marshalled into XML that
 // contains the given grant in Dublin Core format.  The top-level element is
 // PMH’s <record>.
-func buildGrantDC(doc any) any {
+func buildGrantDC(decodeFunc func(any) error) (any, error) {
 	var (
 		grantDoc grantDocument
 		entry    grantEntryDC
 	)
-	if err := pmh.Convert(doc, &grantDoc); err != nil {
-		panic(err)
+	if err := decodeFunc(&grantDoc); err != nil {
+		return nil, err
 	}
 	entry.Identifier = grantDoc.Identifier
 	entry.Datestamp = grantDoc.LastModification.In(time.UTC).Format(time.RFC3339)
@@ -85,5 +83,5 @@ func buildGrantDC(doc any) any {
 	entry.Metadata.Record.Description = grantDoc.Description
 	entry.Metadata.Record.Date = buildTimespan(grantDoc, "/")
 	entry.Metadata.Record.Type = "grant"
-	return entry
+	return entry, nil
 }
