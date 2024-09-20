@@ -1,35 +1,21 @@
-/*
-expirerer deletes resumtion tokens that are older than their expiration date.
-It should run regularly, e.g. once a day.
-
-See the README file for further information.
-*/
 package main
 
 import (
-	"context"
-	"fmt"
-	"time"
+	"log/slog"
+	"os"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go4.org/must"
-	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/mongo"
+	tbr_errors "gitlab.com/bronger/tools/errors"
+	tbr_logging "gitlab.com/bronger/tools/logging"
+	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/options"
+	"jugit.fz-juelich.de/fdm/pmh-server/expire"
 )
 
+func init() {
+	tbr_logging.Init(os.Stderr, slog.LevelInfo)
+}
+
 func main() {
-	mongoClient, _, err := mongo.InitializeMongo(context.Background())
-	if err != nil {
-		return
-	}
-	tokenColl, err := mongo.GetTokenColl(context.Background(), mongoClient)
-	if err != nil {
-		return
-	}
-	defer must.Do(func() error { return mongoClient.Disconnect(context.Background()) })
-	if result, err := tokenColl.DeleteMany(context.Background(),
-		bson.D{{"expirationDate", bson.D{{"$lte", time.Now()}}}}); err != nil {
-		panic(err)
-	} else {
-		fmt.Println(result.DeletedCount, "tokens expired")
-	}
+	count, err := expire.Expire(options.MongoOpts)
+	tbr_errors.ExitOnExpectedError(err, "Error in MongoDB interaction", 10)
+	slog.Info("Tokens expired", "number", count)
 }

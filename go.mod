@@ -8,10 +8,10 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	gitlab.com/bronger/tools v0.0.0-20230825105701-52687403a66d
 	go.mongodb.org/mongo-driver v1.17.0
-	go4.org v0.0.0-20201209231011-d4a079459e60
+	go4.org v0.0.0-20230225012048-214862532bf5
 	golang.org/x/exp v0.0.0-20221006183845-316c7553db56
 	golang.org/x/net v0.21.0
-	jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240920173808-e01c4099b245
+	jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240920175804-ff0680ccbd6b
 )
 
 require (
