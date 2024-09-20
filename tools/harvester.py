@@ -4,7 +4,7 @@
 plausible list of entries using resumption tokens.
 """
 
-import urllib.request, gzip
+import urllib.request, gzip, sys
 from xml.etree import ElementTree
 
 
@@ -15,29 +15,29 @@ def open_url(url):
     return gzip.GzipFile(fileobj=stream)
 
 
-ids = []
+records = {}
 
-def collect_ids(tree):
-    result = []
-    for element in tree.findall(".//{http://www.openarchives.org/OAI/2.0/}identifier"):
-        result.append(element.text)
-    return result
-
-def get_tree(resumption_token):
-    if resumption_token:
-        tree = ElementTree.parse(open_url("https://gepris.its.kfa-juelich.de?verb=ListRecords&resumptionToken=" +
-                                          resumption_token))
-    else:
-        tree = ElementTree.parse(open_url("https://gepris.its.kfa-juelich.de?verb=ListRecords&metadataPrefix=marcxml"))
-    ids.extend(collect_ids(tree))
+def collect_records(resumption_token):
+    url = "https://gepris.its.kfa-juelich.de?verb=ListRecords&" + \
+        ("resumptionToken=" + resumption_token if resumption_token else "metadataPrefix=marcxml")
+    content = open_url(url).read().decode()
+    tree = ElementTree.fromstring(content)
+    for record in tree.findall(".//{http://www.openarchives.org/OAI/2.0/}record"):
+        id_ = record.find(".//{http://www.openarchives.org/OAI/2.0/}identifier").text
+        assert id_ not in records, id_
+        records[id_] = record
     return tree.find(".//{http://www.openarchives.org/OAI/2.0/}resumptionToken").text
+
 
 resumption_token = None
 while True:
-    resumption_token = get_tree(resumption_token)
-    print(resumption_token)
+    resumption_token = collect_records(resumption_token)
+    print(resumption_token, file=sys.stderr)
     if not resumption_token:
         break
 
-assert len(ids) == len(set(ids))
-print(len(ids), len(set(ids)), ids[:10])
+print(len(records), file=sys.stderr)
+
+for id_ in sorted(records):
+    record = records[id_]
+    print(ElementTree.tostring(record, encoding="unicode"))
