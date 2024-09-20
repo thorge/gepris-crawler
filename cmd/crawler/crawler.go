@@ -23,7 +23,8 @@ import (
 	tbr_logging "gitlab.com/bronger/tools/logging"
 	"go.mongodb.org/mongo-driver/bson"
 	mongodb "go.mongodb.org/mongo-driver/mongo"
-	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/mongo"
+	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/options"
+	"jugit.fz-juelich.de/fdm/pmh-server/mongo"
 )
 
 // init sets up logging into a file.  The file is called “gepris-crawler.log”,
@@ -350,7 +351,7 @@ func main() {
 	{
 		var mongoClient *mongodb.Client
 		var err error
-		mongoClient, coll, err = mongo.InitializeMongo(context.Background())
+		mongoClient, coll, err = mongo.InitializeMongo(context.Background(), options.MongoOpts)
 		tbr_errors.ExitOnExpectedError(err, "Could not initialise connection to MongoDB", 10)
 		defer func() {
 			err := mongoClient.Disconnect(context.Background())

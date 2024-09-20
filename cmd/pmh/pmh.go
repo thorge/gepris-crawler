@@ -11,14 +11,13 @@ import (
 	"strconv"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/options"
 	"jugit.fz-juelich.de/fdm/pmh-server"
 )
 
 func main() {
 	pmh.Serve(pmh.Options{
-		DBName:     "gepris",
-		CollName:   "projects",
-		AddIndices: []string{"endYear"},
+		MongoOpts:  options.MongoOpts,
 		Name:       "GEPRIS – project database of the Deutsche Forschungsgemeinschaft (DFG); UNOFFICIAL",
 		URL:        "https://gepris.its.kfa-juelich.de",
 		AdminEmail: "juser@fz-juelich.de",
