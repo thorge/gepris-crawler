@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 
@@ -15,7 +16,9 @@ func init() {
 }
 
 func main() {
-	count, err := expire.Expire(options.MongoOpts)
+	total, _, err := expire.Count(context.Background(), options.MongoOpts)
 	tbr_errors.ExitOnExpectedError(err, "Error in MongoDB interaction", 10)
-	slog.Info("Tokens expired", "number", count)
+	expired, err := expire.Expire(context.Background(), options.MongoOpts)
+	tbr_errors.ExitOnExpectedError(err, "Error in MongoDB interaction", 10)
+	slog.Info("Tokens expired", "total", total, "expired", expired)
 }

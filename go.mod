@@ -11,7 +11,7 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5
 	golang.org/x/exp v0.0.0-20221006183845-316c7553db56
 	golang.org/x/net v0.21.0
-	jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240920175804-ff0680ccbd6b
+	jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240921020613-f8d6f3c43e36
 )
 
 require (
