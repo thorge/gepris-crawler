@@ -40,10 +40,6 @@ pmh
   This is supposed to be run continuously.  It exposes an OAI-PMH_ interface to
   fetch the projects.
 
-expirerer
-  This is supposed to be run as a cron job (e.g. once per day).  It deletes too
-  old PMH resumption tokens.
-
 .. _OAI-PMH: http://www.openarchives.org/OAI/openarchivesprotocol.html
 
 
@@ -89,22 +85,6 @@ MONGODB_HOST
   URI to the MongoDB instance.  The PMH server creates a database called
   “gepris“ in MongoDB (which is empty before the first crawler run).
   MONGODB_HOST defaults to “mongodb://localhost”.
-
-
-The expirerer
--------------
-
-You install the expirerer by calling
-::
-
-   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/expirerer@latest
-
-Then, you can invoke it with “expirerer”.  It takes the following environment
-variables:
-
-MONGODB_HOST
-  URI to the MongoDB instance.  The GEPRIS crawler creates a database called
-  “gepris“ in MongoDB.  MONGODB_HOST defaults to “mongodb://localhost”.
 
 
 Contact
