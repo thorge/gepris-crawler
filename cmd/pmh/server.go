@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 
+	tbr_errors "gitlab.com/bronger/tools/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/options"
 	"jugit.fz-juelich.de/fdm/pmh-server"
@@ -47,8 +48,7 @@ var sinceEndYear int
 func init() {
 	if endYearRaw := os.Getenv("GEPRIS_PMH_SINCE_END_YEAR"); endYearRaw != "" {
 		var err error
-		if sinceEndYear, err = strconv.Atoi(endYearRaw); err != nil {
-			panic(err)
-		}
+		sinceEndYear, err = strconv.Atoi(endYearRaw)
+		tbr_errors.ExitOnExpectedError(err, "Invalid value of GEPRIS_PMH_SINCE_END_YEAR", 10)
 	}
 }
