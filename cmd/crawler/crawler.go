@@ -23,6 +23,7 @@ import (
 	tbr_logging "gitlab.com/bronger/tools/logging"
 	"go.mongodb.org/mongo-driver/bson"
 	mongodb "go.mongodb.org/mongo-driver/mongo"
+	mongoopts "go.mongodb.org/mongo-driver/mongo/options"
 	"jugit.fz-juelich.de/fdm/gepris-crawler/internal/options"
 	"jugit.fz-juelich.de/fdm/pmh-server/mongo"
 )
@@ -305,6 +306,8 @@ func processProjectNumbers(projectNumbers <-chan string, projects chan<- project
 	}
 }
 
+var optUpsert = mongoopts.Replace().SetUpsert(true)
+
 // storeProjects reads projects from “projects” and writes them to MongoDB.  It
 // must not be run with multiple instances.  It reports back on the given wait
 // group when it’s finished.
@@ -324,7 +327,7 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 			}
 			filter, update := project.updateMongo()
 			update["lastModification"] = time.Now()
-			result, err := coll.ReplaceOne(context.Background(), filter, update, mongo.MongoOpts)
+			result, err := coll.ReplaceOne(context.Background(), filter, update, optUpsert)
 			tbr_errors.ExitOnExpectedError(err, "MongoDB error when replacing document", 10)
 			if result.UpsertedCount+result.ModifiedCount != 1 {
 				slog.Error("project was not written properly to MongoDB",

@@ -288,6 +288,8 @@ jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240921132619-900481f03d9b h1:VrD+ow3
 jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240921132619-900481f03d9b/go.mod h1:YQvwHqLRMnfaBrrZMYRlgaSmUsz3+6lP0Sj/rmu2E+8=
 jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240922072836-0b2db14983f3 h1:e6PE6zIO6m1rfBGTv0ggvpQsu15hE6a/C7GNPkMz3+Y=
 jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240922072836-0b2db14983f3/go.mod h1:YQvwHqLRMnfaBrrZMYRlgaSmUsz3+6lP0Sj/rmu2E+8=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240923160744-266d6f96ce56 h1:snNZayqUlC7QhCWhwXKJQie2j3GdYzp/ZsFu43P4bt4=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240923160744-266d6f96ce56/go.mod h1:sGo8BAsndZ3J2JhC6lsg8a5tcijlABg3+brpjcy011Y=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
