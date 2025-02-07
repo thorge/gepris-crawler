@@ -11,13 +11,14 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5
 	golang.org/x/exp v0.0.0-20221006183845-316c7553db56
 	golang.org/x/net v0.21.0
-	jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240923164357-c1f90462b692
+	jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20250207093531-0fdb597860a2
 )
 
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/go-chi/chi/v5 v5.0.10 // indirect
+	github.com/go-chi/chi/v5 v5.1.0 // indirect
 	github.com/go-chi/httplog/v2 v2.0.9 // indirect
+	github.com/golang-cz/httplog v0.0.0-20241002114323-98e09d6f537a // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect

@@ -33,10 +33,14 @@ github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.m
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/go-chi/chi/v5 v5.0.10 h1:rLz5avzKpjqxrYwXNfmjkrYYXOyLJd37pz53UFHC6vk=
 github.com/go-chi/chi/v5 v5.0.10/go.mod h1:DslCQbL2OYiznFReuXYUmQ2hGd1aDpCnlMNITLSKoi8=
+github.com/go-chi/chi/v5 v5.1.0 h1:acVI1TYaD+hhedDJ3r54HyA6sExp3HfXq7QWEEY/xMw=
+github.com/go-chi/chi/v5 v5.1.0/go.mod h1:DslCQbL2OYiznFReuXYUmQ2hGd1aDpCnlMNITLSKoi8=
 github.com/go-chi/httplog/v2 v2.0.9 h1:RK1TBETd4SSwu075tcfm0KKxR/k98RUfzmOWxLaocGg=
 github.com/go-chi/httplog/v2 v2.0.9/go.mod h1:/XXdxicJsp4BA5fapgIC3VuTD+z0Z/VzukoB3VDc1YE=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
+github.com/golang-cz/httplog v0.0.0-20241002114323-98e09d6f537a h1:BAyyIK6rc6Tq9vT2KVlPJXD8EVv/LpaFwn4fgfLwtHg=
+github.com/golang-cz/httplog v0.0.0-20241002114323-98e09d6f537a/go.mod h1:bgk4Ij/0OQ89UeoFFAQrSNhbbr4rKJ0fwWfo7wc+TCc=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
@@ -282,6 +286,8 @@ honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
 jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240923164357-c1f90462b692 h1:NQLENTHYNrGkAAM5HtMsioBhu43oXZfhXMjwhySTPAo=
 jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20240923164357-c1f90462b692/go.mod h1:sGo8BAsndZ3J2JhC6lsg8a5tcijlABg3+brpjcy011Y=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20250207093531-0fdb597860a2 h1:CCBPMR0FJAPIOUQUNInkZV2wAuHhHFUSmIR2vzLiIyQ=
+jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20250207093531-0fdb597860a2/go.mod h1:WTrFv0ik7qAhgVfAXanaPJ1/qRSgEoJn+SYjpqI0lgQ=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
