@@ -367,7 +367,7 @@ func main() {
 	projects := make(chan projecter)
 	allProjectNumbers := make(map[string]bool)
 	var allProjectNumbersMutex sync.Mutex
-	for i := 0; i < numberProjectWorkers; i++ {
+	for range numberProjectWorkers {
 		projectWorkersWaitGroup.Add(1)
 		go processProjectNumbers(
 			projectNumbers, projects, &projectWorkersWaitGroup, allProjectNumbers, &allProjectNumbersMutex)
