@@ -93,7 +93,6 @@ func processProject(projectNumber string) (result projecter, err error) {
 }
 
 var ErrNoFurtherResults = errors.New("no further search results")
-var searchResultRegexp = regexp.MustCompile(`<a class="intern" href="/gepris/projekt/(?P<projectNumber>\d+)">mehr</a>`)
 
 // getSearchResults downloads the GEPRIS results page with resultsPerPage
 // entries, scans for the project numbers and sends them to the channel
