@@ -25,6 +25,7 @@ func main() {
 		Filter: bson.D{{"$or", bson.A{
 			bson.D{{"endYear", bson.D{{"$gte", sinceEndYear}}}},
 			bson.D{{"endYear", bson.D{{"$eq", 0}}}},
+			bson.D{{"latestChildEndYear", bson.D{{"$gte", sinceEndYear}}}},
 		}}},
 		MetadataFormats: []pmh.MetadataFormat{
 			{

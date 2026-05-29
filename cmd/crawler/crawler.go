@@ -174,11 +174,13 @@ func getYears() []int {
 // Therefore, it contains only the subset of fields of grants that are needed
 // here.
 type grantDocument struct {
-	Identifier  string
-	Title       string
-	ShortTitle  string
-	Parent      string
-	ParentTitle string
+	Identifier         string
+	Title              string
+	ShortTitle         string
+	EndYear            int
+	Parent             string
+	ParentTitle        string
+	latestChildEndYear int
 }
 
 var sfbRegexp = regexp.MustCompile(`^SFB ([0-9]+)`)
@@ -201,18 +203,24 @@ func findShortTitle(doc grantDocument) string {
 	return fmt.Sprintf("DFG project %v", doc.Identifier)
 }
 
-// updateParentTitles walks through all projects in the MongoDB database and
-// sets the parent titles according to the parent identifiers.  When fetching
-// the projects from the GEPRIS, we only get the *identifier* of the parent
-// project.  But when returning results in PMH requests, we also need the
-// title.  In order to avoid having to query for them then, we use
+// denormalizeParentRelations walks through all projects in the MongoDB
+// database and sets the parent titles according to the parent identifiers.
+// When fetching the projects from the GEPRIS, we only get the *identifier* of
+// the parent project.  But when returning results in PMH requests, we also
+// need the title.  In order to avoid having to query for them then, we use
 // denormalisation by adding the parent’s title here.
-func updateParentTitles(coll *mongodb.Collection) {
-	slog.Info("updating all parent project titles …")
+//
+// Moreover, this function sets the latestChildEndYear field of all parents.
+// This way, the PMH server can offer parent projects for harvesting even if
+// they are too old, as long as one of their respective children is new enough.
+func denormalizeParentRelations(coll *mongodb.Collection) {
 	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
 		tbr_errors.ExitWithExpectedError("Could not access MongoDB", 10)
 	} else {
 		titles := make(map[string]string)
+		latestChildEndYears := make(map[string]int)
+		oldLatestChildEndYears := make(map[string]int)
+		slog.Info("updating all parent project titles …")
 		for cursor.Next(context.Background()) {
 			var document grantDocument
 			if err := cursor.Decode(&document); err != nil {
@@ -221,6 +229,9 @@ func updateParentTitles(coll *mongodb.Collection) {
 			titles[document.Identifier] = document.Title
 			oldParentTitle := document.ParentTitle
 			if document.Parent != "" {
+				if latestChildEndYears[document.Parent] < document.EndYear {
+					latestChildEndYears[document.Parent] = document.EndYear
+				}
 				if foundParentTitle, ok := titles[document.Parent]; !ok {
 					var parentDocument grantDocument
 					if err := coll.FindOne(context.Background(), bson.D{{"identifier", document.Parent}}).
@@ -228,6 +239,9 @@ func updateParentTitles(coll *mongodb.Collection) {
 						slog.Error("MongoDB result invalid",
 							"document", document.Parent, "error", err)
 					} else {
+						oldLatestChildEndYears[parentDocument.Identifier] =
+							parentDocument.latestChildEndYear
+
 						document.ParentTitle = parentDocument.Title
 						if document.ParentTitle == "" {
 							slog.Error("no title found", "document", document.Parent)
@@ -272,8 +286,33 @@ func updateParentTitles(coll *mongodb.Collection) {
 			}
 		}
 		tbr_errors.ExitOnExpectedError(cursor.Err(), "Could not iterate though MongoDB documents", 10)
+		slog.Info("finished updating all parent project titles")
+
+		slog.Info("updating all parents’ “end year of latest child” …")
+		for identifier, latestChildEndYear := range latestChildEndYears {
+			if latestChildEndYear == oldLatestChildEndYears[identifier] {
+				continue
+			}
+			if result, err := coll.UpdateOne(
+				context.Background(), bson.D{{"identifier", identifier}},
+				bson.D{{"$set", bson.M{
+					"latestChildEndYear": latestChildEndYear,
+					"lastModification":   time.Now()}}}); err != nil {
+				tbr_errors.ExitWithExpectedError("MongoDB error while updating", 10,
+					"document identifier", identifier)
+			} else {
+				if result.UpsertedCount+result.MatchedCount != 1 {
+					slog.Error("end year of latest child was not written properly to MongoDB",
+						"result", result)
+				} else {
+					slog.Debug("updated end year of latest child",
+						"parent identifier", identifier,
+						"end year of latest child", latestChildEndYear)
+				}
+			}
+		}
+		slog.Info("finished updating all parents’ “end year of latest child”")
 	}
-	slog.Info("finished updating all parent project titles")
 }
 
 // processProjectNumbers is meant to run in multiple instances parallelly.  It
@@ -397,5 +436,5 @@ func main() {
 	close(projects)
 	projectStorageWaitGroup.Wait()
 
-	updateParentTitles(coll)
+	denormalizeParentRelations(coll)
 }

@@ -22,5 +22,6 @@ type grantDocument struct {
 	Institutions       []string
 	Parent             string
 	ParentTitle        string
+	latestChildEndYear int
 	LastModification   time.Time
 }
