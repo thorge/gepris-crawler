@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,10 +16,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	tbr_errors "gitlab.com/bronger/tools/errors"
 	tbr_logging "gitlab.com/bronger/tools/logging"
 	"go.mongodb.org/mongo-driver/bson"
@@ -53,7 +54,6 @@ const (
 	resultsPerPage       = 50
 )
 
-var subProjectListRegex = regexp.MustCompile("^.*Projekte.*$")
 var cachePages = os.Getenv("CRAWLER_DEBUG") == "1"
 
 // processProject takes the DFG project number and returns a projecter object
@@ -61,41 +61,60 @@ var cachePages = os.Getenv("CRAWLER_DEBUG") == "1"
 // storage (MongoDB).  This function decides which concrete type will be used
 // for the projecter.
 func processProject(projectNumber string) (result projecter, err error) {
-	url := fmt.Sprintf("https://gepris.dfg.de/gepris/projekt/%v", projectNumber)
-	var body string
-	filename := fmt.Sprintf("project-pages/%v.html", projectNumber)
+	url := fmt.Sprintf("https://gepris.dfg.de/backend/project/get?id=%v&ranking=0", projectNumber)
+	var raw []byte
+	filename := fmt.Sprintf("project-pages/%v.json", projectNumber)
 	if cachePages {
 		if bodyRaw, err := os.ReadFile(filename); err == nil {
 			slog.Info("Could take page from cache")
-			body = string(bodyRaw)
+			raw = bodyRaw
 		}
 	}
-	if body == "" {
-		if body, err = fetchPage(slog.Default(), url); err != nil {
+	if raw == nil {
+		if raw, err = fetchJSON(slog.Default(), url); err != nil {
 			return nil, err
 		}
 		if cachePages {
-			err = os.WriteFile(filename, []byte(body), 0666)
+			err = os.WriteFile(filename, raw, 0666)
 			tbr_errors.ExitOnExpectedError(err, "Could not write file", 10, "filename", filename)
 		}
 	}
-	doc, err := getDocument(body)
-	tbr_errors.ExitOnExpectedError(err, "Could not parse HTML", 10, "body", body)
-	if doc.Find("h2.facelift").FilterFunction(filterByRegexp(subProjectListRegex)).Length() > 0 {
-		result = &projectUmbrella{projectBase: projectBase{identifier: "G:(GEPRIS)" + projectNumber}}
-	} else if doc.Find(`span.name:contains("Antragstellende Institution")`).Length() > 0 {
-		result = &projectInstitution{projectBase: projectBase{identifier: "G:(GEPRIS)" + projectNumber}}
-	} else {
-		result = &projectPerson{projectBase: projectBase{identifier: "G:(GEPRIS)" + projectNumber}}
+	var project apiProject
+	if err := json.Unmarshal(raw, &project); err != nil {
+		return nil, fmt.Errorf("could not parse JSON from GEPRIS: %v", err)
 	}
-	err = result.scanDocument(slog.Default(), doc)
-	return result, err
+	identifier := "G:(GEPRIS)" + projectNumber
+	switch {
+	case len(project.Teilprojekte.Groups) > 0:
+		result = &projectUmbrella{projectParties: projectParties{
+			projectBase: projectBase{identifier: identifier}}}
+	case hasPersonGroup(project.Per, "Antragsteller/-in"):
+		result = &projectPerson{projectBase: projectBase{identifier: identifier}}
+	default:
+		result = &projectInstitution{projectParties: projectParties{
+			projectBase: projectBase{identifier: identifier}}}
+	}
+	if err = result.fillData(slog.Default(), &project); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 var ErrNoFurtherResults = errors.New("no further search results")
 
-// getSearchResults downloads the GEPRIS results page with resultsPerPage
-// entries, scans for the project numbers and sends them to the channel
+// searchResponse is the part of the GEPRIS search API response that the
+// crawler needs.
+type searchResponse struct {
+	Hits struct {
+		Total int `json:"total"`
+		Hits  []struct {
+			PrjID int `json:"prj_id"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+// getSearchResults downloads one page of GEPRIS search results with
+// resultsPerPage entries and sends the project numbers to the channel
 // projectNumbers.  The given index is the starting index in the search
 // results.  Thus, the caller should start with 0 and increment it by
 // resultsPerPage in subsequent calls.  The given year finds all projects
@@ -103,55 +122,42 @@ var ErrNoFurtherResults = errors.New("no further search results")
 // value may be ErrNoFurtherResults, which means that the index was larger than
 // the number of search results.
 func getSearchResults(year int, index int, projectNumbers chan<- string) error {
-	var fundedIn string
-	if year != 0 {
-		fundedIn = fmt.Sprintf("gefoerdertIn=%v&", year)
+	payload := map[string]any{
+		"size": resultsPerPage,
+		"from": index,
+		"sort": "prj_beginn_jahr:asc",
 	}
-	url := fmt.Sprintf("https://gepris.dfg.de/gepris/OCTOPUS?context=projekt&findButton=historyCall&"+
-		fundedIn+"hitsPerPage=%v&index=%v&task=doKatalog", resultsPerPage, index)
-	var body string
-	filename := fmt.Sprintf("search-results/%v_%v_%v.html", year, index, resultsPerPage)
+	if year != 0 {
+		payload["foerderungszeitraum_von"] = strconv.Itoa(year)
+		payload["foerderungszeitraum_bis"] = strconv.Itoa(year)
+	}
+	var raw []byte
+	filename := fmt.Sprintf("search-results/%v_%v_%v.json", year, index, resultsPerPage)
 	if cachePages {
 		if bodyRaw, err := os.ReadFile(filename); err == nil {
 			slog.Info("Could take search results from cache")
-			body = string(bodyRaw)
+			raw = bodyRaw
 		}
 	}
-	if body == "" {
+	if raw == nil {
 		var err error
-		if body, err = fetchPage(slog.Default(), url); err != nil {
+		if raw, err = postJSON(slog.Default(), "https://gepris.dfg.de/backend/project/search", payload); err != nil {
 			return err
 		}
 		if cachePages {
-			err = os.WriteFile(filename, []byte(body), 0666)
+			err = os.WriteFile(filename, raw, 0666)
 			tbr_errors.ExitOnExpectedError(err, "Could not write file", 10, "filename", filename)
 		}
 	}
-	if doc, err := getDocument(body); err != nil {
-		return err
-	} else {
-		if doc.Find(`p.warning:contains("Ihre Suche ergab leider keine Treffer")`).Length() != 0 {
-			return ErrNoFurtherResults
-		} else {
-			var err error
-			doc.Find("h2 > a").EachWithBreak(func(_ int, s *goquery.Selection) bool {
-				if url, exists := s.Attr("href"); exists {
-					if match := urlRegexp.FindStringSubmatch(url); match == nil {
-						err = fmt.Errorf("invalid URL “%v” found on search page", url)
-						return false
-					} else {
-						projectNumbers <- match[1]
-					}
-				} else {
-					err = fmt.Errorf("h2 > a element on search page had no “href” attribute")
-					return false
-				}
-				return true
-			})
-			if err != nil {
-				return err
-			}
-		}
+	var response searchResponse
+	if err := json.Unmarshal(raw, &response); err != nil {
+		return fmt.Errorf("could not parse JSON from GEPRIS: %v", err)
+	}
+	if index >= response.Hits.Total {
+		return ErrNoFurtherResults
+	}
+	for _, hit := range response.Hits.Hits {
+		projectNumbers <- strconv.Itoa(hit.PrjID)
 	}
 	return nil
 }
@@ -316,8 +322,8 @@ func denormalizeParentRelations(coll *mongodb.Collection) {
 }
 
 // processProjectNumbers is meant to run in multiple instances parallelly.  It
-// reads project numbers from a channel “projectNumbers”, scrapes the projects’
-// data from the GEPRIS website, and writes the results back into another
+// reads project numbers from a channel “projectNumbers”, fetches the projects’
+// data from the GEPRIS backend API, and writes the results back into another
 // channel “projects”.  It finishes when projectNumbers is closed and reports
 // this back in the given wait group.  “allProjectNumbers” holds a map created
 // by the caller that contains all process numbers already processed because
@@ -335,7 +341,7 @@ func processProjectNumbers(projectNumbers <-chan string, projects chan<- project
 		if !alreadyProcessed {
 			if project, err := processProject(projectNumber); err != nil {
 				slog.Error("Could not process project",
-					"url", fmt.Sprintf("https://gepris.dfg.de/gepris/projekt/%v", projectNumber),
+					"url", fmt.Sprintf("https://gepris.dfg.de/backend/project/get?id=%v", projectNumber),
 					"error", err)
 			} else {
 				projects <- project

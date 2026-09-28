@@ -5,7 +5,6 @@ go 1.23
 toolchain go1.23.0
 
 require (
-	github.com/PuerkitoBio/goquery v1.8.0
 	gitlab.com/bronger/tools v0.0.0-20230825105701-52687403a66d
 	go.mongodb.org/mongo-driver v1.17.0
 	go4.org v0.0.0-20230225012048-214862532bf5
@@ -15,9 +14,7 @@ require (
 )
 
 require (
-	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/go-chi/chi/v5 v5.1.0 // indirect
-	github.com/go-chi/httplog/v2 v2.0.9 // indirect
 	github.com/golang-cz/httplog v0.0.0-20241002114323-98e09d6f537a // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.3.0 // indirect

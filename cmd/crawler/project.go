@@ -1,26 +1,110 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"regexp"
+	"strconv"
+	"strings"
 
-	"github.com/PuerkitoBio/goquery"
-	tbr_errors "gitlab.com/bronger/tools/errors"
 	tbr_logging "gitlab.com/bronger/tools/logging"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/exp/slices"
 )
 
-// Types of the projecter interface are able to scan data from a project HTML
-// page and fill their internal data structure with it.  Then, they can prepare
-// the data structures needed to write it to the MongoDB database.  This
-// abstraction is useful because GEPRIS projects fall into some categories with
-// different HTML parsing and datafield requirements.
+// Types of the projecter interface are able to scan data from a project's
+// GEPRIS JSON record and fill their internal data structure with it.  Then,
+// they can prepare the data structures needed to write it to the MongoDB
+// database.  This abstraction is useful because GEPRIS projects fall into some
+// categories with different datafield requirements.
 type projecter interface {
-	scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error
+	fillData(logger tbr_logging.Logger, project *apiProject) error
 	updateMongo() (bson.M, bson.M)
 	isDifferent(oldProject map[string]any) bool
 	getIdentifier() string
+}
+
+// apiProject is the subset of the GEPRIS “project/get” API response needed by
+// the crawler.
+type apiProject struct {
+	ID           int            `json:"id"`
+	Data         map[string]any `json:"data"`
+	Per          apiGroups      `json:"per"`
+	Ins          apiGroups      `json:"ins"`
+	Teilprojekte apiGroups      `json:"teilprojekte"`
+}
+
+// apiGroups is a GEPRIS API field like “per”, “ins”, or “teilprojekte”: an
+// object holding the sequence of the group keys in the “order” item and one
+// item per group holding the entries of that group.
+type apiGroups struct {
+	Order  []string
+	Groups map[string][]apiEntry
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (groups *apiGroups) UnmarshalJSON(raw []byte) error {
+	var outer map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &outer); err != nil {
+		return err
+	}
+	groups.Groups = make(map[string][]apiEntry, len(outer))
+	for key, value := range outer {
+		if key == "order" {
+			if err := json.Unmarshal(value, &groups.Order); err != nil {
+				return err
+			}
+			continue
+		}
+		var entries []apiEntry
+		if err := json.Unmarshal(value, &entries); err != nil {
+			return err
+		}
+		groups.Groups[key] = entries
+	}
+	return nil
+}
+
+// apiEntry is a single entry (person, institution, or sub-project) of an
+// apiGroups field.
+type apiEntry struct {
+	ID           int            `json:"id"`
+	Data         map[string]any `json:"data"`
+	SortCriteria string         `json:"sortCriteria"`
+}
+
+// stringFromMap returns the string value of the given key of the given map, or
+// an empty string if the key is not present or does not hold a string.
+func stringFromMap(m map[string]any, key string) string {
+	if value, ok := m[key].(string); ok {
+		return value
+	}
+	return ""
+}
+
+// intFromMap returns the integer value of the given key of the given map, or 0
+// if the key is not present or does not hold a number.
+func intFromMap(m map[string]any, key string) int {
+	switch value := m[key].(type) {
+	case int:
+		return value
+	case float64:
+		return int(value)
+	default:
+		return 0
+	}
+}
+
+// hasPersonGroup returns whether the given apiGroups field contains at least
+// one entry with the given group label.
+func hasPersonGroup(groups apiGroups, label string) bool {
+	for _, entries := range groups.Groups {
+		for _, entry := range entries {
+			if stringFromMap(entry.Data, "BTR_BEZEICHNUNG_GRUP") == label {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // projectBase contains the data included in every DFG project.  This is an
@@ -39,45 +123,41 @@ type projectBase struct {
 	parentTitle        string
 }
 
-// scanDocument fills the internal data fields of the project with the data
-// found in the given HTML document.
-func (project *projectBase) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
-	var err error
-	if project.title, err = getField(doc.Find("div.details > h1")); err != nil {
+// fillData fills the internal data fields of the project with the data found
+// in the given GEPRIS JSON record.
+func (project *projectBase) fillData(logger tbr_logging.Logger, data *apiProject) error {
+	project.title = normalizeString(stringFromMap(data.Data, "PRJ_TITEL"))
+	if project.title == "" {
 		whitelist := []string{"G:(GEPRIS)61027617", "G:(GEPRIS)142091898", "G:(GEPRIS)221781256"}
 		if slices.Contains(whitelist, project.identifier) {
 			project.title = fmt.Sprintf("DFG project %v (no proper title known)", project.identifier)
 		} else {
-			return err
+			return fmt.Errorf("project has no title")
 		}
 	}
-	if project.title == "" {
-		return fmt.Errorf("project has no title")
-	}
-	project.process, err = getField(doc.Find(`span.name`).FilterFunction(filterByRegexp(processRegexp)).Next())
-	tbr_errors.ExitOnExpectedError(err, "HTML document from GEPRIS has unexpected format", 10)
+	project.process = normalizeString(stringFromMap(data.Data, "PRJ_VERFAHREN"))
 	if project.process == "" {
 		return fmt.Errorf("project has no DFG process")
 	}
-	if parent, err := getParent(doc); err != nil {
-		return err
+	if rahPrjID := intFromMap(data.Data, "RAH_PRJ_ID"); rahPrjID != 0 && rahPrjID != data.ID {
+		logger.Debug("Found parent project")
+		project.parent = "G:(GEPRIS)" + strconv.Itoa(rahPrjID)
+	}
+	if fkl := normalizeString(stringFromMap(data.Data, "FKL_BEZEICHNUNG")); fkl == "" {
+		logger.Warn("Project has no discipline")
 	} else {
-		if parent != "" {
-			logger.Debug("Found parent project")
-			project.parent = parent
+		for _, discipline := range strings.Split(fkl, " · ") {
+			project.disciplines = append(project.disciplines, normalizeString(discipline))
 		}
 	}
-	project.disciplines = parseDisciplines(doc)
-	if len(project.disciplines) == 0 {
-		logger.Warn("Project has no discipline")
+	var err error
+	project.startYear, project.endYear, err = parseTimespan(
+		normalizeString(stringFromMap(data.Data, "PRJ_FOERDERZEITRAUM")))
+	if err != nil {
+		return err
 	}
-	project.startYear, project.endYear, err = parseTimespan(doc)
-	tbr_errors.ExitOnExpectedError(err, "HTML document from GEPRIS has unexpected format", 10)
-	project.description, err = getField(doc.Find("div#projekttext"))
-	tbr_errors.ExitOnExpectedError(err, "HTML document from GEPRIS has unexpected format", 10)
-	if project.description == "" {
-		return fmt.Errorf("project has no description (not even empty)")
-	} else if project.description == "Keine Zusammenfassung vorhanden" {
+	project.description = normalizeString(stringFromMap(data.Data, "PRJ_ABSTRACT"))
+	if project.description == "Keine Zusammenfassung vorhanden" {
 		project.description = ""
 	}
 	return nil
@@ -107,7 +187,7 @@ func (project projectBase) updateMongo() (bson.M, bson.M) {
 // the one this method is called on.  “oldProject” is usually taken from the
 // MongoDB database, and we want to know whether it needs to be updated (with a
 // touched lastModification field).  Note that “oldProject” is a mapping
-// string → any because this is the lowest common denominator for all project
+// string → any because this is the lowest common denominator for all project
 // types (person, institution, and umbrella).
 func (project projectBase) isDifferent(oldProject map[string]any) bool {
 	if project.identifier != oldProject["identifier"].(string) {
@@ -137,25 +217,40 @@ type projectPerson struct {
 	partPeople []string
 }
 
-// scanDocument fills the internal data fields of the project with the data
-// found in the given HTML document.
-func (project *projectPerson) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
-	if err := project.projectBase.scanDocument(logger, doc); err != nil {
+// fillData fills the internal data fields of the project with the data found
+// in the given GEPRIS JSON record.
+func (project *projectPerson) fillData(logger tbr_logging.Logger, data *apiProject) error {
+	if err := project.projectBase.fillData(logger, data); err != nil {
 		return err
 	}
-	if results := parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(applicantRegexp)).
-		Next()); len(results) == 0 {
-		whitelist := []string{"5336466", "5382838", "5395416", "5449328", "5449334", "5449348", "29528568",
-			"463409137", "495365311"}
+	for _, key := range data.Per.Order {
+		for _, entry := range data.Per.Groups[key] {
+			label := stringFromMap(entry.Data, "BTR_BEZEICHNUNG_GRUP")
+			name := normalizeString(stringFromMap(entry.Data, "bt_partner_name_komplett"))
+			if name == "" {
+				logger.Warn("Person entry has no name", "group", key, "label", label, "entry", entry.ID)
+				continue
+			}
+			switch label {
+			case "Antragsteller/-in":
+				project.applicants = append(project.applicants, name)
+			case "Weitere antragsbeteiligte Personen":
+				project.partPeople = append(project.partPeople, name)
+			default:
+				logger.Warn("Unknown person group", "group", key, "label", label)
+			}
+		}
+	}
+	if len(project.applicants) == 0 {
+		whitelist := []string{"G:(GEPRIS)5336466", "G:(GEPRIS)5382838", "G:(GEPRIS)5395416",
+			"G:(GEPRIS)5449328", "G:(GEPRIS)5449334", "G:(GEPRIS)5449348", "G:(GEPRIS)29528568",
+			"G:(GEPRIS)463409137", "G:(GEPRIS)495365311"}
 		if slices.Contains(whitelist, project.identifier) {
 			logger.Debug("Ignoring missing applicant for white-listed project")
 		} else {
 			return fmt.Errorf("no applicant found")
 		}
-	} else {
-		project.applicants = results
 	}
-	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
 		logger.Debug("Found participating people", "number", len(project.partPeople))
 	}
@@ -176,7 +271,7 @@ func (project projectPerson) updateMongo() (bson.M, bson.M) {
 // the one this method is called on.  “oldProject” is usually taken from the
 // MongoDB database, and we want to know whether it needs to be updated (with a
 // touched lastModification field).  Note that “oldProject” is a mapping
-// string → any because this is the lowest common denominator for all project
+// string → any because this is the lowest common denominator for all project
 // types (person, institution, and umbrella).
 func (project projectPerson) isDifferent(oldProject map[string]any) bool {
 	return project.projectBase.isDifferent(oldProject) ||
@@ -185,10 +280,11 @@ func (project projectPerson) isDifferent(oldProject map[string]any) bool {
 		!equal(project.partPeople, oldProject["partPeople"])
 }
 
-// projectInstitution contains the data of a project the applicant of which is
-// an institution.  Additionally to the requirements of projectBase, at least
-// one item in “institutions” is a requirement.
-type projectInstitution struct {
+// projectParties contains the data of a project the applicant of which is an
+// institution.  This is an abstract type that is only embedded into others
+// (projectInstitution and projectUmbrella).  It adds the person and
+// institution data fields to the ones of projectBase.
+type projectParties struct {
 	projectBase
 	institutions     []string
 	coInstitutions   []string
@@ -198,37 +294,103 @@ type projectInstitution struct {
 	partPeople       []string
 }
 
-// scanDocument fills the internal data fields of the project with the data
-// found in the given HTML document.
-func (project *projectInstitution) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
-	if err := project.projectBase.scanDocument(logger, doc); err != nil {
+// fillParties fills the person and institution data fields from the given
+// GEPRIS JSON record.
+func (project *projectParties) fillParties(logger tbr_logging.Logger, data *apiProject) {
+	for _, key := range data.Ins.Order {
+		for _, entry := range data.Ins.Groups[key] {
+			label := stringFromMap(entry.Data, "BTR_BEZEICHNUNG_GRUP")
+			name := normalizeString(stringFromMap(entry.Data, "INS_NAME"))
+			if name == "" {
+				logger.Warn("Institution entry has no name", "group", key, "label", label, "entry", entry.ID)
+				continue
+			}
+			switch label {
+			case "Antragstellende Institution":
+				project.institutions = append(project.institutions, name)
+			case "Mitantragstellende Institution":
+				project.coInstitutions = append(project.coInstitutions, name)
+			case "Weitere antragsbeteiligte Institutionen":
+				project.partInstitutions = append(project.partInstitutions, name)
+			default:
+				logger.Warn("Unknown institution group", "group", key, "label", label)
+			}
+		}
+	}
+	for _, key := range data.Per.Order {
+		for _, entry := range data.Per.Groups[key] {
+			label := stringFromMap(entry.Data, "BTR_BEZEICHNUNG_GRUP")
+			name := normalizeString(stringFromMap(entry.Data, "bt_partner_name_komplett"))
+			if name == "" {
+				logger.Warn("Person entry has no name", "group", key, "label", label, "entry", entry.ID)
+				continue
+			}
+			switch label {
+			case "Sprecher/-in", "Teilprojektleiter/-in", "Projektverantwortliche Personen":
+				project.speakers = append(project.speakers, name)
+			case "Co-Sprecher/-in":
+				project.coSpeakers = append(project.coSpeakers, name)
+			case "Weitere antragsbeteiligte Personen":
+				project.partPeople = append(project.partPeople, name)
+			default:
+				logger.Warn("Unknown person group", "group", key, "label", label)
+			}
+		}
+	}
+}
+
+// updateMongo returns the “filter” and “update” parameters ready to be used
+// for “mongo.Collection.UpdateOne”.
+func (project projectParties) updateMongo() (bson.M, bson.M) {
+	filter, update := project.projectBase.updateMongo()
+	update["institutions"] = project.institutions
+	update["coInstitutions"] = project.coInstitutions
+	update["partInstitutions"] = project.partInstitutions
+	update["speakers"] = project.speakers
+	update["coSpeakers"] = project.coSpeakers
+	update["partPeople"] = project.partPeople
+	return filter, update
+}
+
+// isDifferentParties returns whether the person and institution data of the
+// given project is different from the one this method is called on.
+func (project projectParties) isDifferentParties(oldProject map[string]any) bool {
+	return !equal(project.institutions, oldProject["institutions"]) ||
+		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
+		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
+		!equal(project.speakers, oldProject["speakers"]) ||
+		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
+		!equal(project.partPeople, oldProject["partPeople"])
+}
+
+// projectInstitution contains the data of a project the applicant of which is
+// an institution.
+type projectInstitution struct {
+	projectParties
+}
+
+// fillData fills the internal data fields of the project with the data found
+// in the given GEPRIS JSON record.
+func (project *projectInstitution) fillData(logger tbr_logging.Logger, data *apiProject) error {
+	if err := project.projectBase.fillData(logger, data); err != nil {
 		return err
 	}
-	if results := parseLinkList(
-		doc.Find(`span.name`).FilterFunction(filterByRegexp(institutionsRegexp)).Next()); len(results) == 0 {
-		return fmt.Errorf("no applying institution found")
-	} else {
-		project.institutions = results
+	project.fillParties(logger, data)
+	if len(project.institutions) == 0 {
+		logger.Warn("No applying institution found")
 	}
-	project.coInstitutions = parseLinkList(
-		doc.Find(`span.name`).FilterFunction(filterByRegexp(coInstitutionsRegexp)).Next())
 	if len(project.coInstitutions) != 0 {
 		logger.Debug("Found co-applying institutions", "number", len(project.coInstitutions))
 	}
-	project.partInstitutions = parseLinkList(
-		doc.Find(`span.name`).FilterFunction(filterByRegexp(partInstitutionsRegexp)).Next())
 	if len(project.partInstitutions) != 0 {
 		logger.Debug("Found participating institutions", "number", len(project.partInstitutions))
 	}
-	project.speakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next())
 	if len(project.speakers) == 0 {
 		logger.Warn("No speaker found")
 	}
-	project.coSpeakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(coSpeakersRegexp)).Next())
 	if len(project.coSpeakers) != 0 {
 		logger.Debug("Found co-speakers", "number", len(project.coSpeakers))
 	}
-	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
 		logger.Debug("Found participating people", "number", len(project.partPeople))
 	}
@@ -238,14 +400,8 @@ func (project *projectInstitution) scanDocument(logger tbr_logging.Logger, doc *
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
 func (project projectInstitution) updateMongo() (bson.M, bson.M) {
-	filter, update := project.projectBase.updateMongo()
+	filter, update := project.projectParties.updateMongo()
 	update["type"] = "institutional"
-	update["institutions"] = project.institutions
-	update["coInstitutions"] = project.coInstitutions
-	update["partInstitutions"] = project.partInstitutions
-	update["speakers"] = project.speakers
-	update["coSpeakers"] = project.coSpeakers
-	update["partPeople"] = project.partPeople
 	return filter, update
 }
 
@@ -253,62 +409,41 @@ func (project projectInstitution) updateMongo() (bson.M, bson.M) {
 // the one this method is called on.  “oldProject” is usually taken from the
 // MongoDB database, and we want to know whether it needs to be updated (with a
 // touched lastModification field).  Note that “oldProject” is a mapping
-// string → any because this is the lowest common denominator for all project
+// string → any because this is the lowest common denominator for all project
 // types (person, institution, and umbrella).
 func (project projectInstitution) isDifferent(oldProject map[string]any) bool {
-	return project.projectBase.isDifferent(oldProject) ||
+	return project.projectParties.isDifferent(oldProject) ||
 		oldProject["type"].(string) != "institutional" ||
-		!equal(project.institutions, oldProject["institutions"]) ||
-		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
-		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
-		!equal(project.speakers, oldProject["speakers"]) ||
-		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
-		!equal(project.partPeople, oldProject["partPeople"])
+		project.projectParties.isDifferentParties(oldProject)
 }
 
-// projectUmbrella represents a DFG project with sub projects.  It inherits the
-// requirements of projectBase and adds no own.
+// projectUmbrella represents a DFG project with sub projects.
 type projectUmbrella struct {
-	projectBase
-	institutions     []string
-	coInstitutions   []string
-	partInstitutions []string
-	speakers         []string
-	coSpeakers       []string
-	partPeople       []string
+	projectParties
 }
 
-// scanDocument fills the internal data fields of the project with the data
-// found in the given HTML document.
-func (project *projectUmbrella) scanDocument(logger tbr_logging.Logger, doc *goquery.Document) error {
-	if err := project.projectBase.scanDocument(logger, doc); err != nil {
+// fillData fills the internal data fields of the project with the data found
+// in the given GEPRIS JSON record.
+func (project *projectUmbrella) fillData(logger tbr_logging.Logger, data *apiProject) error {
+	if err := project.projectBase.fillData(logger, data); err != nil {
 		return err
 	}
-	if results := parseLinkList(
-		doc.Find(`span.name`).FilterFunction(filterByRegexp(institutionsRegexp)).Next()); len(results) == 0 {
+	project.fillParties(logger, data)
+	if len(project.institutions) == 0 {
 		logger.Debug("No applying institution found")
-	} else {
-		project.institutions = results
 	}
-	project.coInstitutions = parseLinkList(
-		doc.Find(`span.name`).FilterFunction(filterByRegexp(coInstitutionsRegexp)).Next())
 	if len(project.coInstitutions) != 0 {
 		logger.Debug("Found co-applying institutions", "number", len(project.coInstitutions))
 	}
-	project.partInstitutions = parseLinkList(
-		doc.Find(`span.name`).FilterFunction(filterByRegexp(partInstitutionsRegexp)).Next())
 	if len(project.partInstitutions) != 0 {
 		logger.Debug("Found participating institutions", "number", len(project.partInstitutions))
 	}
-	project.speakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(leiterRegexp)).Next())
 	if len(project.speakers) == 0 {
 		logger.Warn("No speaker found")
 	}
-	project.coSpeakers = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(coSpeakersRegexp)).Next())
 	if len(project.coSpeakers) != 0 {
 		logger.Debug("Found co-speakers", "number", len(project.coSpeakers))
 	}
-	project.partPeople = parseLinkList(doc.Find(`span.name`).FilterFunction(filterByRegexp(partPeopleRegexp)).Next())
 	if len(project.partPeople) != 0 {
 		logger.Debug("Found participating people", "number", len(project.partPeople))
 	}
@@ -318,14 +453,8 @@ func (project *projectUmbrella) scanDocument(logger tbr_logging.Logger, doc *goq
 // updateMongo returns the “filter” and “update” parameters ready to be used
 // for “mongo.Collection.UpdateOne”.
 func (project projectUmbrella) updateMongo() (bson.M, bson.M) {
-	filter, update := project.projectBase.updateMongo()
+	filter, update := project.projectParties.updateMongo()
 	update["type"] = "umbrella"
-	update["institutions"] = project.institutions
-	update["coInstitutions"] = project.coInstitutions
-	update["partInstitutions"] = project.partInstitutions
-	update["speakers"] = project.speakers
-	update["coSpeakers"] = project.coSpeakers
-	update["partPeople"] = project.partPeople
 	return filter, update
 }
 
@@ -333,17 +462,12 @@ func (project projectUmbrella) updateMongo() (bson.M, bson.M) {
 // the one this method is called on.  “oldProject” is usually taken from the
 // MongoDB database, and we want to know whether it needs to be updated (with a
 // touched lastModification field).  Note that “oldProject” is a mapping
-// string → any because this is the lowest common denominator for all project
+// string → any because this is the lowest common denominator for all project
 // types (person, institution, and umbrella).
 func (project projectUmbrella) isDifferent(oldProject map[string]any) bool {
-	return project.projectBase.isDifferent(oldProject) ||
+	return project.projectParties.isDifferent(oldProject) ||
 		oldProject["type"].(string) != "umbrella" ||
-		!equal(project.institutions, oldProject["institutions"]) ||
-		!equal(project.coInstitutions, oldProject["coInstitutions"]) ||
-		!equal(project.partInstitutions, oldProject["partInstitutions"]) ||
-		!equal(project.speakers, oldProject["speakers"]) ||
-		!equal(project.coSpeakers, oldProject["coSpeakers"]) ||
-		!equal(project.partPeople, oldProject["partPeople"])
+		project.projectParties.isDifferentParties(oldProject)
 }
 
 // equal returns whether the given slices of strings are equal, i.e. have the
@@ -353,7 +477,10 @@ func equal(a []string, b any) bool {
 	if b == nil {
 		return len(a) == 0
 	}
-	bAsArray := b.(bson.A)
+	bAsArray, ok := b.(bson.A)
+	if !ok {
+		return false
+	}
 	if len(a) != len(bAsArray) {
 		return false
 	}
@@ -363,77 +490,4 @@ func equal(a []string, b any) bool {
 		}
 	}
 	return true
-}
-
-// parseDisciplines returns all disciplines (“Fachbereiche”) found in doc.
-func parseDisciplines(doc *goquery.Document) (disciplines []string) {
-	doc.Find(`span.name`).FilterFunction(filterByRegexp(disciplineRegexp)).Next().
-		FilterFunction(func(i int, s *goquery.Selection) bool {
-			return s.Nodes[0].Type == 3
-		}).Each(func(i int, s *goquery.Selection) {
-		disciplines = append(disciplines, normalizeString(s.Text()))
-	})
-	return
-}
-
-// parseLinkList returns all items found in the given subset of HTML elements.
-// More precisely, the items are the text content in the “<a class="intern"
-// href="…">…</a>” elements.
-func parseLinkList(s *goquery.Selection) (elements []string) {
-	s.Find("a.intern").Each(func(i int, s *goquery.Selection) {
-		elements = append(elements, normalizeString(s.Text()))
-	})
-	return
-}
-
-var urlRegexp = regexp.MustCompile(`^/gepris/projekt/(\d+)$`)
-
-// getParent returns the project identifier of the parent project.  The “doc”
-// argument contains the parsed HTML page for the project.  If it does not have
-// a parent, an empty string is returned.
-func getParent(doc *goquery.Document) (string, error) {
-	fieldNode := doc.Find(`span.name`).FilterFunction(filterByRegexp(parentRegexp)).Next()
-	if fieldNode.Length() == 0 {
-		return "", nil
-	} else if fieldNode.Length() > 1 {
-		return "", fmt.Errorf("ambiguous “Teilprojekt zu” field")
-	}
-	linkNode := fieldNode.Find("a.intern")
-	if linkNode.Length() != 1 {
-		return "", fmt.Errorf("not exactly one link in “Teilprojekt zu” field")
-	}
-	var url string
-	if value, exists := linkNode.Attr("href"); !exists {
-		return "", fmt.Errorf("no URL to parent project found in “Teilprojekt zu”")
-	} else {
-		url = value
-	}
-	if match := urlRegexp.FindStringSubmatch(url); match == nil {
-		return "", fmt.Errorf("invalid URL found in “Teilprojekt zu”")
-	} else {
-		return "G:(GEPRIS)" + match[1], nil
-	}
-}
-
-// Helper regexps to be used when scanning DOMs in the scanDocument methods.
-var leiterRegexp = regexp.MustCompile(`^\s*(Teilprojektleiter|Sprecher|Leiter)(in(nen)?)?` +
-	`( / (Teilprojektleiter|Sprecher|Leiter))?\s*$`)
-var disciplineRegexp = regexp.MustCompile(`^\s*Fachliche Zuordnung\s*$`)
-var processRegexp = regexp.MustCompile(`^\s*DFG-Verfahren\s*$`)
-var parentRegexp = regexp.MustCompile(`^\s*Teilprojekt zu\s*$`)
-var applicantRegexp = regexp.MustCompile(`^\s*Antragsteller(in(nen)?)?( / Antragsteller)?\s*$`)
-var partPeopleRegexp = regexp.MustCompile(`^\s*Beteiligte Person(en)?\s*$`)
-var institutionsRegexp = regexp.MustCompile(`^\s*Antragstellende Institution\s*$`)
-var coInstitutionsRegexp = regexp.MustCompile(`^\s*Mitantragstellende Institution\s*$`)
-var partInstitutionsRegexp = regexp.MustCompile(`^\s*Beteiligte Einrichtung\s*$`)
-var coSpeakersRegexp = regexp.MustCompile(`^\s*Co-Sprecher(in(nen)?)?( / Co-Sprecher)?\s*$`)
-var fundingRegexp = regexp.MustCompile(`^\s*Förderung\s*$`)
-
-// filterByRegexp returns a function that is ready to be used as an argument to
-// goquery.FilterFunction.  Eventually, this reduces the nodes set to those
-// matching the given regexp.
-func filterByRegexp(re *regexp.Regexp) func(int, *goquery.Selection) bool {
-	return func(_ int, s *goquery.Selection) bool {
-		return re.MatchString(s.Text())
-	}
 }

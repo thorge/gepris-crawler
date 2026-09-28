@@ -5,17 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/PuerkitoBio/goquery"
 )
-
-// getDocument returns the DOM for the given HTML document as a goquery
-// document.  This can then be used to search for text content needed to
-// retrieve the projects’ data.
-func getDocument(body string) (doc *goquery.Document, err error) {
-	doc, err = goquery.NewDocumentFromReader(strings.NewReader(body))
-	return
-}
 
 var whitespaceRegexp = regexp.MustCompile(`[\p{Z}\n\r\t]+`)
 
@@ -25,26 +15,6 @@ func normalizeString(s string) (result string) {
 	result = whitespaceRegexp.ReplaceAllString(s, " ")
 	result = strings.TrimSpace(result)
 	return result
-}
-
-// getField returns the normalised text content of the given document node(s).
-// It returns an error if the field was empty or ambiguous.
-func getField(s *goquery.Selection) (value string, err error) {
-	s.EachWithBreak(func(i int, s *goquery.Selection) bool {
-		if i == 0 {
-			value = normalizeString(s.Text())
-			if value == "" {
-				err = fmt.Errorf(`First occurence of field was empty`)
-				return false
-			} else {
-				return true
-			}
-		} else {
-			err = fmt.Errorf(`Field was not unique`)
-			return false
-		}
-	})
-	return value, err
 }
 
 // mustAtoi converts a string to an int and panics if something goes wrong.  It
@@ -58,18 +28,13 @@ func mustAtoi(s string) (i int) {
 	return
 }
 
-var timespanRegex = regexp.MustCompile(`Förderung von (\d\d\d\d) bis (\d\d\d\d)|` +
-	`Förderung seit (\d\d\d\d)|Förderung in (\d\d\d\d)|Förderung: Bis (\d\d\d\d)|` +
-	`Befindet sich in der laufenden Förderung.`)
+var timespanRegex = regexp.MustCompile(`^von (\d\d\d\d) bis (\d\d\d\d)$|` +
+	`^seit (\d\d\d\d)$|^in (\d\d\d\d)$|^Bis (\d\d\d\d)$`)
 
-// parseTimespan returns start and end year for a project.  It gets the HTML
-// document of the project as input.  If any of start or end cannot be found in
-// the document, 0 is used as the value.
-func parseTimespan(doc *goquery.Document) (start int, end int, err error) {
-	timespan, err := getField(doc.Find(`span.name`).FilterFunction(filterByRegexp(fundingRegexp)).Next())
-	if err != nil {
-		return start, end, err
-	}
+// parseTimespan returns start and end year for a project from the given GEPRIS
+// funding period string (the “PRJ_FOERDERZEITRAUM” data field).  If any of
+// start or end cannot be found in the string, 0 is used as the value.
+func parseTimespan(timespan string) (start int, end int, err error) {
 	matches := timespanRegex.FindStringSubmatch(timespan)
 	if len(matches) != 0 {
 		if matches[5] != "" {
