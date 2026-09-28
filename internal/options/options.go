@@ -15,7 +15,7 @@ func init() {
 	}
 	MongoOpts = mongo.Options{
 		Host:       mongoURI,
-		DBName:     "gepris",
+		DBName:     "gepris-new",
 		CollName:   "projects",
 		AddIndices: []string{"endYear"},
 	}
