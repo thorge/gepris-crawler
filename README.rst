@@ -77,6 +77,42 @@ CRAWLER_SKIP_ENTITIES
   days.  By setting CRAWLER_SKIP_ENTITIES to “1”, this step is skipped.
 
 
+The report generator
+--------------------
+
+“report” creates CSV files from the database, e.g. for comparisons between
+universities.  You install it by calling
+::
+
+   go install jugit.fz-juelich.de/fdm/gepris-crawler/cmd/report@latest
+
+Every report is defined by a YAML file in the directory “``reports``”: a
+title, a description (which states the definitions used, e.g. what counts as
+“new in 2025”), parameters, a MongoDB aggregation pipeline in JSON, and the
+columns of the CSV file.  The pipeline may use the parameters in Go template
+syntax, e.g. ``{{.year}}``; ``{{ids .vergleichsunis}}`` turns a list of
+entries with an “``id``” into a JSON array of IDs.  Parameters shared by all
+reports, e.g. lists of universities, are defined in
+“``reports/parameters.yaml``”.
+
+Call it like this::
+
+   report                                   # create all reports
+   report sfb-pis-statistik                 # create only this report
+   report -param year=2024 sachbeihilfen-nach-fachgebiet
+
+It writes “``<report>.csv``” and “``<report>.txt``” into the directory
+“``report-output``” (change with ``-output``).  The CSV files are made for a
+German Excel (semicolons, decimal commas, UTF-8 with byte order mark).  The
+text file contains the description, the parameters used, and the date of the
+last crawler run and of the last full crawler run, so that nobody passes
+numbers around without their limitations.  The crawler records its runs in
+the collection “``crawls``” for that.
+
+It takes the environment variable MONGODB_HOST like the crawler.  Note that
+comparisons over several years need a full crawler run (CRAWLER_FULL) first.
+
+
 Data model
 ----------
 

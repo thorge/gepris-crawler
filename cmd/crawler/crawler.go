@@ -168,6 +168,15 @@ func getSearchResults(year int, index int, hits chan<- apiSearchHit) error {
 	return nil
 }
 
+// recordCrawl writes the time span and the crawled years of this crawler run
+// into the MongoDB collection “crawls”.  This way, users of the database know
+// how current the data is, and whether a full crawl has been made.
+func recordCrawl(db *mongodb.Database, start time.Time, years []int) {
+	_, err := db.Collection("crawls").InsertOne(context.Background(), bson.M{
+		"start": start, "end": time.Now(), "full": len(years) == 1 && years[0] == 0, "years": years})
+	tbr_errors.ExitOnExpectedError(err, "Could not record crawl in MongoDB", 10)
+}
+
 // getYears returns the years of funding to be searched by the crawler.  If all
 // projects should be found, it returns a single 0.
 func getYears() []int {
@@ -424,6 +433,7 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 // Afterwards, the persons and institutions participating in the crawled
 // projects are downloaded and written to MongoDB, see crawlEntities.
 func main() {
+	start := time.Now()
 	var coll *mongodb.Collection
 	{
 		var mongoClient *mongodb.Client
@@ -463,7 +473,8 @@ func main() {
 	references := newEntityReferences()
 	go storeProjects(projects, coll, &projectStorageWaitGroup, references)
 
-	for _, year := range getYears() {
+	years := getYears()
+	for _, year := range years {
 		index := 0
 		for {
 			err := getSearchResults(year, index, hits)
@@ -490,4 +501,5 @@ func main() {
 	cancelTicker()
 
 	denormalizeParentRelations(coll)
+	recordCrawl(coll.Database(), start, years)
 }

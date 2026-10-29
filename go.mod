@@ -10,6 +10,7 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5
 	golang.org/x/exp v0.0.0-20221006183845-316c7553db56
 	golang.org/x/net v0.21.0
+	gopkg.in/yaml.v3 v3.0.1
 	jugit.fz-juelich.de/fdm/pmh-server v0.0.0-20250207093531-0fdb597860a2
 )
 
