@@ -241,6 +241,28 @@ func TestStoredDocument(t *testing.T) {
 	}
 }
 
+func TestMissingLookupsChangeSourceHash(t *testing.T) {
+	data := parseTestProject(t)
+	withoutLookups := &projectUmbrella{projectParties: projectParties{
+		projectBase: projectBase{identifier: "G:(GEPRIS)100"}}}
+	if err := withoutLookups.fillData(slog.Default(), data); err != nil {
+		t.Fatal(err)
+	}
+	if withoutLookups.mainProcess != "" || withoutLookups.classifications[0].ResearchAreaKey != "44" {
+		t.Errorf("unexpected data without lookups: %q, %+v", withoutLookups.mainProcess,
+			withoutLookups.classifications[0])
+	}
+	useTestLookups(t)
+	withLookups := &projectUmbrella{projectParties: projectParties{
+		projectBase: projectBase{identifier: "G:(GEPRIS)100"}}}
+	if err := withLookups.fillData(slog.Default(), data); err != nil {
+		t.Fatal(err)
+	}
+	if withoutLookups.sourceHash == withLookups.sourceHash {
+		t.Error("missing lookups do not change the source hash")
+	}
+}
+
 func TestSearchHitChangesSourceHash(t *testing.T) {
 	useTestLookups(t)
 	data := parseTestProject(t)

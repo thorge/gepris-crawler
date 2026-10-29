@@ -492,7 +492,10 @@ func (project *projectBase) fillExtended(logger tbr_logging.Logger, data *apiPro
 			DOI:           stringFromMap(entry.Data, "PUB_DOI"),
 		})
 	}
-	project.sourceHash = hashRaw(data.raw, data.hit.Fachklass, data.hit.ResearchSites)
+	// Whether the lookup tables were available is part of the hash, so that
+	// names missing due to a failed download are added in the next crawl.
+	project.sourceHash = hashRaw(data.raw, data.hit.Fachklass, data.hit.ResearchSites,
+		[]byte(strconv.FormatBool(lookups.loaded)))
 }
 
 // updateMongo returns the “filter” and “update” parameters ready to be used

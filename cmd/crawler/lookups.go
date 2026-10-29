@@ -50,6 +50,9 @@ type lookupTables struct {
 	// universities and other top-level institutions.  The keys are
 	// institution IDs; ParentKey is the region.
 	researchSites map[string]lookupEntry
+	// loaded is false if the tables could not be downloaded.  Then, all
+	// maps are empty, and names are missing in the projects.
+	loaded bool
 }
 
 // disciplines are not part of the GEPRIS classification tables.  Their key
@@ -62,7 +65,8 @@ var disciplines = map[string]lookupEntry{
 }
 
 // lookups is set by the main function before any project is processed and
-// read-only afterwards.
+// read-only afterwards.  If it cannot be loaded, it stays empty, so that the
+// crawler can continue to work for PMH.
 var lookups = &lookupTables{}
 
 // apiTranslation is an entry of the GEPRIS “general/translations” API
@@ -146,7 +150,7 @@ func parseLookups(translationsRaw, dropdownsRaw []byte) (*lookupTables, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := lookupTables{disciplines: disciplines}
+	result := lookupTables{disciplines: disciplines, loaded: true}
 	for _, table := range []struct {
 		target      *map[string]lookupEntry
 		translation string

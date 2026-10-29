@@ -452,10 +452,17 @@ func main() {
 
 	ctxTicker, cancelTicker := context.WithCancel(context.Background())
 	go enableTicker(ctxTicker, slog.Default())
-	lookups, err = loadLookups()
-	tbr_errors.ExitOnExpectedError(err, "Could not load GEPRIS classifications", 10)
-	err = storeLookups(coll.Database(), lookups)
-	tbr_errors.ExitOnExpectedError(err, "Could not store GEPRIS classifications", 10)
+	// The classifications are not needed for PMH, so failing to get them must
+	// not stop the crawler.
+	if loadedLookups, err := loadLookups(); err != nil {
+		slog.Error("Could not load GEPRIS classifications; names of processes, subjects, "+
+			"and research sites will be missing until the next crawl", "error", err)
+	} else {
+		lookups = loadedLookups
+		if err := storeLookups(coll.Database(), lookups); err != nil {
+			slog.Error("Could not store GEPRIS classifications", "error", err)
+		}
+	}
 
 	var projectWorkersWaitGroup sync.WaitGroup
 	hits := make(chan apiSearchHit, 10*numberProjectWorkers)
