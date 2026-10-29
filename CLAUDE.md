@@ -13,17 +13,32 @@ Personen und Einrichtungen in MongoDB.
   `docs: ...`, `refactor: ...`, `test: ...`.
 - **Niemals** `Co-Authored-By:`- oder sonstige Attributions-Zeilen in Commits oder PRs.
 
-## Upstream
+## Ziele
+
+- Schwerpunkt dieses Forks sind **Auswertungen und Berichte** über die GEPRIS-Daten
+  (z. B. Uni-Vergleiche, Kennzahlen zu Verfahren). OAI-PMH ist für uns nebensächlich.
+- Bei Entscheidungen haben Auswertbarkeit und Berichte Vorrang vor Upstream-Tauglichkeit.
+
+## Verhältnis zum Original (Jülich)
 
 - Origin ist ein eigener GitHub-Fork; das Original liegt unter
-  https://jugit.fz-juelich.de/fdm/gepris-crawler. Änderungen sollen später dorthin
-  zurückgespielt werden.
-- Daher: Diffs klein und upstream-tauglich halten; Code-Stil, Kommentare (Englisch,
-  typografische Anführungszeichen “…” wie im Original) und Struktur des Originals
-  beibehalten. Diese Datei (`CLAUDE.md`) gehört nicht in den Upstream-MR.
-- `cmd/report` ist allgemein und upstream-tauglich; die Berichte in `reports/` (inkl.
-  Vergleichsunis) sind CAU-spezifisch und gehören nicht in den Upstream-MR. Berichte
-  und Beschreibungen dort sind auf Deutsch, CSV-Format für deutsches Excel.
+  https://jugit.fz-juelich.de/fdm/gepris-crawler. Ob unsere Änderungen dort gemerged
+  werden, ist offen.
+- **Funktionen des Originals nur erweitern, nie kaputt machen.** Konkret:
+  - Der PMH-Server (`cmd/pmh`) muss unverändert funktionieren und dieselbe Ausgabe
+    liefern.
+  - Bestehende Felder der `projects`-Collection (Namen, Typen, Bedeutung) bleiben
+    erhalten; neue Felder, Collections und Programme kommen hinzu.
+  - `lastModification` ändert sich nur bei PMH-relevanten Änderungen, sonst würden
+    Harvester unnötig alles neu abholen.
+  - Bestehende Umgebungsvariablen und das Standardverhalten des Crawlers bleiben;
+    Neues ist zusätzlich oder per Umgebungsvariable abschaltbar.
+- Code-Stil, Kommentare (Englisch, typografische Anführungszeichen “…”) und Struktur
+  wie im Original, damit ein Merge möglich bleibt. Größere Umbauten sind erlaubt,
+  wenn eine Auswertung sie braucht — aber nicht auf Vorrat.
+- `cmd/report` ist allgemein; die Berichte in `reports/` (inkl. Vergleichsunis) sind
+  CAU-spezifisch, auf Deutsch, CSV-Format für deutsches Excel. Weder `reports/` noch
+  diese Datei gehören in einen etwaigen Upstream-MR.
 - Der Commit `PROVISIONAL: Change Mongo DB name` (DB `gepris-new`) ist als provisorisch
   markiert — nicht ohne Rückfrage ändern.
 
