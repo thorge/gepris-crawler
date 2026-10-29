@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -19,18 +22,43 @@ import (
 type projecter interface {
 	fillData(logger tbr_logging.Logger, project *apiProject) error
 	updateMongo() (bson.M, bson.M)
+	extendedFields() bson.M
 	isDifferent(oldProject map[string]any) bool
+	isOutdated(oldProject map[string]any) bool
 	getIdentifier() string
+	references() (personIDs, institutionIDs []int)
 }
 
+// schemaVersion is stored with every project.  Increment it whenever the set
+// or the computation of the extended fields (see extendedFields) changes, so
+// that all projects get rewritten during the next crawl.
+const schemaVersion = 1
+
 // apiProject is the subset of the GEPRIS “project/get” API response needed by
-// the crawler.
+// the crawler.  Additionally, raw holds the complete response body, which is
+// used for detecting changes, and hit holds the search hit by which the
+// project was found.  “Publikation” is parsed lazily (see fillExtended) so
+// that an unexpected format does not prevent storing the project.
 type apiProject struct {
-	ID           int            `json:"id"`
-	Data         map[string]any `json:"data"`
-	Per          apiGroups      `json:"per"`
-	Ins          apiGroups      `json:"ins"`
-	Teilprojekte apiGroups      `json:"teilprojekte"`
+	ID           int             `json:"id"`
+	Data         map[string]any  `json:"data"`
+	Per          apiGroups       `json:"per"`
+	Ins          apiGroups       `json:"ins"`
+	Teilprojekte apiGroups       `json:"teilprojekte"`
+	Publikation  json.RawMessage `json:"publikation"`
+	raw          []byte
+	hit          apiSearchHit
+}
+
+// apiSearchHit is the subset of a hit of the GEPRIS “project/search” API
+// response needed by the crawler.  Only the search hits contain the
+// structured subject classification and the research sites of a project.
+// They are parsed lazily (see fillExtended) so that an unexpected format does
+// not prevent storing the project.
+type apiSearchHit struct {
+	PrjID         int             `json:"prj_id"`
+	Fachklass     json.RawMessage `json:"prj_fachklass_json"`
+	ResearchSites json.RawMessage `json:"ins_land_json"`
 }
 
 // apiGroups is a GEPRIS API field like “per”, “ins”, or “teilprojekte”: an
@@ -94,6 +122,184 @@ func intFromMap(m map[string]any, key string) int {
 	}
 }
 
+// boolFromMap returns the boolean value of the given key of the given map, or
+// false if the key is not present or does not hold a boolean.
+func boolFromMap(m map[string]any, key string) bool {
+	value, _ := m[key].(bool)
+	return value
+}
+
+// intFromAny converts an integer as decoded by the MongoDB driver to an int.
+// It returns 0 for anything that is not a number.
+func intFromAny(v any) int {
+	switch value := v.(type) {
+	case int32:
+		return int(value)
+	case int64:
+		return int(value)
+	case float64:
+		return int(value)
+	default:
+		return 0
+	}
+}
+
+// hashRaw returns the SHA-256 hash of the given raw API response parts as a
+// hexadecimal string.  It is used to detect changes in GEPRIS records.
+func hashRaw(parts ...[]byte) string {
+	hash := sha256.New()
+	for _, part := range parts {
+		hash.Write(part)
+		hash.Write([]byte{0})
+	}
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+// parseYears returns start and end year of the given GEPRIS funding period
+// string, or zeros if it cannot be parsed.
+func parseYears(timespan string) (start, end int) {
+	start, end, _ = parseTimespan(normalizeString(timespan))
+	return
+}
+
+var hrefRegexp = regexp.MustCompile(`href="([^"]*)"`)
+
+// extractHref returns the link target of the given HTML snippet (GEPRIS
+// delivers the project website as an <a> element), or an empty string.
+func extractHref(html string) string {
+	if matches := hrefRegexp.FindStringSubmatch(html); matches != nil {
+		return matches[1]
+	}
+	return ""
+}
+
+// classification is a DFG subject classification of a project on all
+// levels of the DFG hierarchy (see lookupTables).  Coordinated programmes are
+// often only classified down to the research area, so that the lower levels
+// are empty.
+type classification struct {
+	DisciplineKey   string `bson:"disciplineKey"`
+	Discipline      string `bson:"discipline"`
+	ResearchAreaKey string `bson:"researchAreaKey"`
+	ResearchArea    string `bson:"researchArea"`
+	ReviewBoardKey  string `bson:"reviewBoardKey"`
+	ReviewBoard     string `bson:"reviewBoard"`
+	SubjectAreaKey  string `bson:"subjectAreaKey"`
+	SubjectArea     string `bson:"subjectArea"`
+}
+
+// researchSite is an institution (e.g. a university) where the research of
+// a project takes place.  This is how GEPRIS attributes projects to
+// institutions in its search, also for individual grants which have no
+// participating institutions.
+type researchSite struct {
+	InstitutionID int    `bson:"institutionId"`
+	Name          string `bson:"name"`
+	RegionKey     string `bson:"regionKey"`
+	Region        string `bson:"region"`
+	InGermany     bool   `bson:"inGermany"`
+}
+
+// parseClassifications returns the subject classifications of the given
+// “prj_fachklass_json” field of a search hit.
+func parseClassifications(logger tbr_logging.Logger, raw json.RawMessage) (result []classification) {
+	var entries []map[string]any
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &entries); err != nil {
+			logger.Warn("Could not parse subject classification", "error", err)
+		}
+	}
+	for _, entry := range entries {
+		c := classification{
+			ResearchAreaKey: stringFromMap(entry, "WSG_KEY"),
+			ReviewBoardKey:  stringFromMap(entry, "FAS_KEY"),
+			SubjectAreaKey:  stringFromMap(entry, "DFA_KEY"),
+		}
+		if c.ResearchAreaKey != "" {
+			c.DisciplineKey = c.ResearchAreaKey[:1]
+		}
+		c.Discipline = lookups.disciplines[c.DisciplineKey].Name
+		c.ResearchArea = lookups.researchAreas[c.ResearchAreaKey].Name
+		c.ReviewBoard = lookups.reviewBoards[c.ReviewBoardKey].Name
+		c.SubjectArea = lookups.subjectAreas[c.SubjectAreaKey].Name
+		result = append(result, c)
+	}
+	return result
+}
+
+// parseResearchSites returns the research sites of the given “ins_land_json”
+// field of a search hit.
+func parseResearchSites(logger tbr_logging.Logger, raw json.RawMessage) (result []researchSite) {
+	var entries []map[string]any
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &entries); err != nil {
+			logger.Warn("Could not parse research sites", "error", err)
+		}
+	}
+	for _, entry := range entries {
+		key := fmt.Sprint(entry["ROOT_ID"])
+		id, err := strconv.Atoi(key)
+		if err != nil {
+			logger.Warn("Invalid research site", "id", entry["ROOT_ID"])
+			continue
+		}
+		site := researchSite{
+			InstitutionID: id,
+			Name:          lookups.researchSites[key].Name,
+			RegionKey:     stringFromMap(entry, "EINR_LND_KEY"),
+			InGermany:     stringFromMap(entry, "EINR_TYP_KEY") == "BL",
+		}
+		site.Region = lookups.regions[site.RegionKey].Name
+		result = append(result, site)
+	}
+	return result
+}
+
+// personRole is a person participating in a project in a certain role.  A
+// person may occur multiple times in a project with different roles.
+type personRole struct {
+	PersonID      int    `bson:"personId"`
+	Name          string `bson:"name"`
+	Role          string `bson:"role"`
+	RoleLabel     string `bson:"roleLabel"`
+	Affiliation   string `bson:"affiliation"`
+	AffiliationEn string `bson:"affiliationEn"`
+	Deceased      bool   `bson:"deceased"`
+}
+
+// institutionRole is an institution participating in a project in a certain
+// role.
+type institutionRole struct {
+	InstitutionID int    `bson:"institutionId"`
+	Name          string `bson:"name"`
+	NameEn        string `bson:"nameEn"`
+	Role          string `bson:"role"`
+	RoleLabel     string `bson:"roleLabel"`
+	Dissolved     bool   `bson:"dissolved"`
+}
+
+// subproject is a sub-project as listed in its umbrella project.  The short
+// title (e.g. “A01”) is only available here.
+type subproject struct {
+	ProjectID  int    `bson:"projectId"`
+	ShortTitle string `bson:"shortTitle"`
+	Title      string `bson:"title"`
+	TitleEn    string `bson:"titleEn"`
+	Status     string `bson:"status"`
+	StartYear  int    `bson:"startYear"`
+	EndYear    int    `bson:"endYear"`
+	LeaderIDs  []int  `bson:"leaderIds"`
+}
+
+// publication is a publication listed as a result of a project.
+type publication struct {
+	PublicationID int    `bson:"publicationId"`
+	Authors       string `bson:"authors"`
+	Title         string `bson:"title"`
+	Year          int    `bson:"year"`
+	DOI           string `bson:"doi"`
+}
+
 // hasPersonGroup returns whether the given apiGroups field contains at least
 // one entry with the given group label.
 func hasPersonGroup(groups apiGroups, label string) bool {
@@ -121,6 +327,30 @@ type projectBase struct {
 	description        string
 	parent             string
 	parentTitle        string
+
+	// The following fields are not needed for PMH but make the database
+	// useful for analyses.  See extendedFields.
+	projectID             int
+	parentID              int
+	titleEn               string
+	descriptionEn         string
+	finalReportSummary    string
+	finalReportSummaryEn  string
+	processKey            string
+	processEn             string
+	mainProcess           string
+	subProcessKey         string
+	subProcess            string
+	website               string
+	internationalRelation string
+	isTransferProject     bool
+	classifications       []classification
+	researchSites         []researchSite
+	personRoles           []personRole
+	institutionRoles      []institutionRole
+	subprojects           []subproject
+	publications          []publication
+	sourceHash            string
 }
 
 // fillData fills the internal data fields of the project with the data found
@@ -160,7 +390,109 @@ func (project *projectBase) fillData(logger tbr_logging.Logger, data *apiProject
 	if project.description == "Keine Zusammenfassung vorhanden" {
 		project.description = ""
 	}
+	project.fillExtended(logger, data)
 	return nil
+}
+
+// fillExtended fills the data fields of the project that are returned by
+// extendedFields.
+func (project *projectBase) fillExtended(logger tbr_logging.Logger, data *apiProject) {
+	project.projectID = data.ID
+	if rahPrjID := intFromMap(data.Data, "RAH_PRJ_ID"); rahPrjID != data.ID {
+		project.parentID = rahPrjID
+	}
+	project.titleEn = normalizeString(stringFromMap(data.Data, "PRJ_TITEL_EN"))
+	project.descriptionEn = normalizeString(stringFromMap(data.Data, "PRJ_ABSTRACT_EN"))
+	project.finalReportSummary = normalizeString(stringFromMap(data.Data, "PRJ_ABABSTRACT"))
+	project.finalReportSummaryEn = normalizeString(stringFromMap(data.Data, "PRJ_ABABSTRACT_EN"))
+	project.processKey = stringFromMap(data.Data, "PRJ_VERFAHREN_KEY")
+	project.processEn = normalizeString(stringFromMap(data.Data, "PRJ_VERFAHREN_EN"))
+	project.mainProcess = lookups.processes[project.processKey].Name
+	project.subProcessKey = lookups.subProcessKey(project.processKey, stringFromMap(data.Data, "PRJ_VERFAHREN"))
+	project.subProcess = lookups.subProcesses[project.subProcessKey].Name
+	project.website = extractHref(stringFromMap(data.Data, "PRJ_WEBSEITE"))
+	project.internationalRelation = normalizeString(stringFromMap(data.Data, "INT_BEZUG"))
+	project.isTransferProject = boolFromMap(data.Data, "IS_TRANSFERPROJEKT")
+	project.classifications = parseClassifications(logger, data.hit.Fachklass)
+	project.researchSites = parseResearchSites(logger, data.hit.ResearchSites)
+	for _, key := range data.Per.Order {
+		for _, entry := range data.Per.Groups[key] {
+			id := entry.ID
+			if id == 0 {
+				id = intFromMap(entry.Data, "per_id")
+			}
+			project.personRoles = append(project.personRoles, personRole{
+				PersonID:      id,
+				Name:          normalizeString(stringFromMap(entry.Data, "bt_partner_name_komplett")),
+				Role:          stringFromMap(entry.Data, "BTR_KEY_GRUP"),
+				RoleLabel:     stringFromMap(entry.Data, "BTR_BEZEICHNUNG_GRUP"),
+				Affiliation:   normalizeString(stringFromMap(entry.Data, "beteiligungen")),
+				AffiliationEn: normalizeString(stringFromMap(entry.Data, "beteiligungen_en")),
+				Deceased:      boolFromMap(entry.Data, "PER_VERSTORBEN"),
+			})
+		}
+	}
+	for _, key := range data.Ins.Order {
+		for _, entry := range data.Ins.Groups[key] {
+			id := entry.ID
+			if id == 0 {
+				id = intFromMap(entry.Data, "INS_ID")
+			}
+			project.institutionRoles = append(project.institutionRoles, institutionRole{
+				InstitutionID: id,
+				Name:          normalizeString(stringFromMap(entry.Data, "INS_NAME")),
+				NameEn:        normalizeString(stringFromMap(entry.Data, "INS_NAMEENGLISCH")),
+				Role:          stringFromMap(entry.Data, "BTR_KEY_GRUP"),
+				RoleLabel:     stringFromMap(entry.Data, "BTR_BEZEICHNUNG_GRUP"),
+				Dissolved:     boolFromMap(entry.Data, "INS_AUFGELOEST"),
+			})
+		}
+	}
+	for _, key := range data.Teilprojekte.Order {
+		entries := data.Teilprojekte.Groups[key]
+		id, err := strconv.Atoi(key)
+		if err != nil || len(entries) == 0 {
+			logger.Warn("Invalid sub-project", "key", key)
+			continue
+		}
+		// There is one entry per sub-project leader; the project data is
+		// the same in all of them.
+		first := entries[0].Data
+		sub := subproject{
+			ProjectID:  id,
+			ShortTitle: normalizeString(stringFromMap(first, "TP_PRJ_KURZTITEL")),
+			Title:      normalizeString(stringFromMap(first, "TP_PRJ_TITEL")),
+			TitleEn:    normalizeString(stringFromMap(first, "TP_PRJ_TITEL_EN")),
+			Status:     stringFromMap(first, "PRJ_STATUS"),
+		}
+		sub.StartYear, sub.EndYear = parseYears(stringFromMap(first, "PRJ_FOERDERZEITRAUM"))
+		for _, entry := range entries {
+			if leaderID := intFromMap(entry.Data, "PER_ID"); leaderID != 0 {
+				sub.LeaderIDs = append(sub.LeaderIDs, leaderID)
+			}
+		}
+		project.subprojects = append(project.subprojects, sub)
+	}
+	var publications []apiEntry
+	if len(data.Publikation) > 0 {
+		if err := json.Unmarshal(data.Publikation, &publications); err != nil {
+			logger.Warn("Could not parse publications", "error", err)
+		}
+	}
+	for _, entry := range publications {
+		id := entry.ID
+		if id == 0 {
+			id = intFromMap(entry.Data, "PUB_ID")
+		}
+		project.publications = append(project.publications, publication{
+			PublicationID: id,
+			Authors:       normalizeString(stringFromMap(entry.Data, "PUB_AUTOR_HRSG")),
+			Title:         normalizeString(stringFromMap(entry.Data, "PUB_TITEL")),
+			Year:          intFromMap(entry.Data, "PUB_ERSCHEINUNGSJAHR"),
+			DOI:           stringFromMap(entry.Data, "PUB_DOI"),
+		})
+	}
+	project.sourceHash = hashRaw(data.raw, data.hit.Fachklass, data.hit.ResearchSites)
 }
 
 // updateMongo returns the “filter” and “update” parameters ready to be used
@@ -180,7 +512,67 @@ func (project projectBase) updateMongo() (bson.M, bson.M) {
 		"parent":      project.parent,
 		"parentTitle": project.parentTitle,
 	}
+	for key, value := range project.extendedFields() {
+		update[key] = value
+	}
 	return filter, update
+}
+
+// extendedFields returns the data fields that are not needed for PMH.  They
+// can be updated without touching the “lastModification” field.
+// “sourceHash” is the hash of the GEPRIS API response, used to detect
+// changes.
+func (project projectBase) extendedFields() bson.M {
+	return bson.M{
+		"projectId":             project.projectID,
+		"parentId":              project.parentID,
+		"titleEn":               project.titleEn,
+		"descriptionEn":         project.descriptionEn,
+		"finalReportSummary":    project.finalReportSummary,
+		"finalReportSummaryEn":  project.finalReportSummaryEn,
+		"processKey":            project.processKey,
+		"processEn":             project.processEn,
+		"mainProcess":           project.mainProcess,
+		"subProcessKey":         project.subProcessKey,
+		"subProcess":            project.subProcess,
+		"website":               project.website,
+		"internationalRelation": project.internationalRelation,
+		"isTransferProject":     project.isTransferProject,
+		"classifications":       project.classifications,
+		"researchSites":         project.researchSites,
+		"personRoles":           project.personRoles,
+		"institutionRoles":      project.institutionRoles,
+		"subprojects":           project.subprojects,
+		"publications":          project.publications,
+		"sourceHash":            project.sourceHash,
+		"schemaVersion":         schemaVersion,
+	}
+}
+
+// isOutdated returns whether the extended fields of “oldProject” need to be
+// updated, i.e. whether the GEPRIS record or the schema version has changed.
+func (project projectBase) isOutdated(oldProject map[string]any) bool {
+	oldSourceHash, _ := oldProject["sourceHash"].(string)
+	return project.sourceHash != oldSourceHash || intFromAny(oldProject["schemaVersion"]) != schemaVersion
+}
+
+// references returns the GEPRIS IDs of all persons and institutions
+// participating in this project, including its research sites.
+func (project projectBase) references() (personIDs, institutionIDs []int) {
+	for _, role := range project.personRoles {
+		if role.PersonID != 0 {
+			personIDs = append(personIDs, role.PersonID)
+		}
+	}
+	for _, role := range project.institutionRoles {
+		if role.InstitutionID != 0 {
+			institutionIDs = append(institutionIDs, role.InstitutionID)
+		}
+	}
+	for _, site := range project.researchSites {
+		institutionIDs = append(institutionIDs, site.InstitutionID)
+	}
+	return
 }
 
 // isDifferent returns whether the given project “oldProject” is different from

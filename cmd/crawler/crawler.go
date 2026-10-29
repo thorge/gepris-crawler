@@ -56,33 +56,42 @@ const (
 
 var cachePages = os.Getenv("CRAWLER_DEBUG") == "1"
 
+// fetchJSONCached downloads the given URL like fetchJSON.  If cachePages is
+// true, the response is taken from or written to the given file.
+func fetchJSONCached(url, filename string) (raw []byte, err error) {
+	if cachePages {
+		if bodyRaw, err := os.ReadFile(filename); err == nil {
+			slog.Info("Could take page from cache", "filename", filename)
+			return bodyRaw, nil
+		}
+	}
+	if raw, err = fetchJSON(slog.Default(), url); err != nil {
+		return nil, err
+	}
+	if cachePages {
+		err = os.WriteFile(filename, raw, 0666)
+		tbr_errors.ExitOnExpectedError(err, "Could not write file", 10, "filename", filename)
+	}
+	return raw, nil
+}
+
 // processProject takes the DFG project number and returns a projecter object
 // already filled with all data.  The caller will then send this object to the
 // storage (MongoDB).  This function decides which concrete type will be used
 // for the projecter.
-func processProject(projectNumber string) (result projecter, err error) {
+func processProject(hit apiSearchHit) (result projecter, err error) {
+	projectNumber := strconv.Itoa(hit.PrjID)
 	url := fmt.Sprintf("https://gepris.dfg.de/backend/project/get?id=%v&ranking=0", projectNumber)
-	var raw []byte
-	filename := fmt.Sprintf("project-pages/%v.json", projectNumber)
-	if cachePages {
-		if bodyRaw, err := os.ReadFile(filename); err == nil {
-			slog.Info("Could take page from cache")
-			raw = bodyRaw
-		}
-	}
-	if raw == nil {
-		if raw, err = fetchJSON(slog.Default(), url); err != nil {
-			return nil, err
-		}
-		if cachePages {
-			err = os.WriteFile(filename, raw, 0666)
-			tbr_errors.ExitOnExpectedError(err, "Could not write file", 10, "filename", filename)
-		}
+	raw, err := fetchJSONCached(url, fmt.Sprintf("project-pages/%v.json", projectNumber))
+	if err != nil {
+		return nil, err
 	}
 	var project apiProject
 	if err := json.Unmarshal(raw, &project); err != nil {
 		return nil, fmt.Errorf("could not parse JSON from GEPRIS: %v", err)
 	}
+	project.raw = raw
+	project.hit = hit
 	identifier := "G:(GEPRIS)" + projectNumber
 	switch {
 	case len(project.Teilprojekte.Groups) > 0:
@@ -106,22 +115,19 @@ var ErrNoFurtherResults = errors.New("no further search results")
 // crawler needs.
 type searchResponse struct {
 	Hits struct {
-		Total int `json:"total"`
-		Hits  []struct {
-			PrjID int `json:"prj_id"`
-		} `json:"hits"`
+		Total int            `json:"total"`
+		Hits  []apiSearchHit `json:"hits"`
 	} `json:"hits"`
 }
 
 // getSearchResults downloads one page of GEPRIS search results with
-// resultsPerPage entries and sends the project numbers to the channel
-// projectNumbers.  The given index is the starting index in the search
+// resultsPerPage entries and sends the hits to the channel “hits”.  The given index is the starting index in the search
 // results.  Thus, the caller should start with 0 and increment it by
 // resultsPerPage in subsequent calls.  The given year finds all projects
 // funded in that year.  Pass 0 if you want to have all projects.  The return
 // value may be ErrNoFurtherResults, which means that the index was larger than
 // the number of search results.
-func getSearchResults(year int, index int, projectNumbers chan<- string) error {
+func getSearchResults(year int, index int, hits chan<- apiSearchHit) error {
 	payload := map[string]any{
 		"size": resultsPerPage,
 		"from": index,
@@ -157,7 +163,7 @@ func getSearchResults(year int, index int, projectNumbers chan<- string) error {
 		return ErrNoFurtherResults
 	}
 	for _, hit := range response.Hits.Hits {
-		projectNumbers <- strconv.Itoa(hit.PrjID)
+		hits <- hit
 	}
 	return nil
 }
@@ -220,7 +226,10 @@ func findShortTitle(doc grantDocument) string {
 // This way, the PMH server can offer parent projects for harvesting even if
 // they are too old, as long as one of their respective children is new enough.
 func denormalizeParentRelations(coll *mongodb.Collection) {
-	if cursor, err := coll.Find(context.Background(), bson.D{}); err != nil {
+	projection := bson.M{"identifier": 1, "title": 1, "shortTitle": 1, "endYear": 1,
+		"parent": 1, "parentTitle": 1, "latestChildEndYear": 1}
+	if cursor, err := coll.Find(context.Background(), bson.D{},
+		mongoopts.Find().SetProjection(projection)); err != nil {
 		tbr_errors.ExitWithExpectedError("Could not access MongoDB", 10)
 	} else {
 		titles := make(map[string]string)
@@ -240,8 +249,8 @@ func denormalizeParentRelations(coll *mongodb.Collection) {
 				}
 				if foundParentTitle, ok := titles[document.Parent]; !ok {
 					var parentDocument grantDocument
-					if err := coll.FindOne(context.Background(), bson.D{{"identifier", document.Parent}}).
-						Decode(&parentDocument); err != nil {
+					if err := coll.FindOne(context.Background(), bson.D{{"identifier", document.Parent}},
+						mongoopts.FindOne().SetProjection(projection)).Decode(&parentDocument); err != nil {
 						slog.Error("MongoDB result invalid",
 							"document", document.Parent, "error", err)
 					} else {
@@ -322,16 +331,17 @@ func denormalizeParentRelations(coll *mongodb.Collection) {
 }
 
 // processProjectNumbers is meant to run in multiple instances parallelly.  It
-// reads project numbers from a channel “projectNumbers”, fetches the projects’
-// data from the GEPRIS backend API, and writes the results back into another
-// channel “projects”.  It finishes when projectNumbers is closed and reports
-// this back in the given wait group.  “allProjectNumbers” holds a map created
-// by the caller that contains all process numbers already processed because
-// some may occur multiple times in “projectNumbers”.
-func processProjectNumbers(projectNumbers <-chan string, projects chan<- projecter, wg *sync.WaitGroup,
+// reads search hits from a channel “hits”, fetches the projects’ data from the
+// GEPRIS backend API, and writes the results back into another channel
+// “projects”.  It finishes when hits is closed and reports this back in the
+// given wait group.  “allProjectNumbers” holds a map created by the caller
+// that contains all process numbers already processed because some may occur
+// multiple times in “hits”.
+func processProjectNumbers(hits <-chan apiSearchHit, projects chan<- projecter, wg *sync.WaitGroup,
 	allProjectNumbers map[string]bool, m *sync.Mutex) {
 	defer wg.Done()
-	for projectNumber := range projectNumbers {
+	for hit := range hits {
+		projectNumber := strconv.Itoa(hit.PrjID)
 		m.Lock()
 		alreadyProcessed := allProjectNumbers[projectNumber]
 		if !alreadyProcessed {
@@ -339,7 +349,7 @@ func processProjectNumbers(projectNumbers <-chan string, projects chan<- project
 		}
 		m.Unlock()
 		if !alreadyProcessed {
-			if project, err := processProject(projectNumber); err != nil {
+			if project, err := processProject(hit); err != nil {
 				slog.Error("Could not process project",
 					"url", fmt.Sprintf("https://gepris.dfg.de/backend/project/get?id=%v", projectNumber),
 					"error", err)
@@ -354,16 +364,33 @@ var optUpsert = mongoopts.Replace().SetUpsert(true)
 
 // storeProjects reads projects from “projects” and writes them to MongoDB.  It
 // must not be run with multiple instances.  It reports back on the given wait
-// group when it’s finished.
-func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync.WaitGroup) {
+// group when it’s finished.  The IDs of all persons and institutions
+// participating in the projects are collected in “references”.
+//
+// The “lastModification” field is only touched if data relevant for PMH has
+// changed.  If only the extended fields are outdated (e.g. because something
+// else in the GEPRIS record has changed), only these are updated.
+func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync.WaitGroup,
+	references *entityReferences) {
 	defer wg.Done()
 	for project := range projects {
+		personIDs, institutionIDs := project.references()
+		references.add(personIDs, institutionIDs)
 		var oldProject map[string]any
 		if err := coll.FindOne(context.Background(), bson.M{"identifier": project.getIdentifier()}).
 			Decode(&oldProject); err != nil && !errors.Is(err, mongodb.ErrNoDocuments) {
 			tbr_errors.ExitWithExpectedError("Could not retrieve document from MongoDB", 10)
 		}
-		if oldProject == nil || project.isDifferent(oldProject) {
+		if oldProject != nil && !project.isDifferent(oldProject) && project.isOutdated(oldProject) {
+			slog.Debug("project has outdated extended fields", "identifier", project.getIdentifier())
+			result, err := coll.UpdateOne(context.Background(), bson.M{"identifier": project.getIdentifier()},
+				bson.M{"$set": project.extendedFields()})
+			tbr_errors.ExitOnExpectedError(err, "MongoDB error when updating document", 10)
+			if result.MatchedCount != 1 {
+				slog.Error("project was not written properly to MongoDB",
+					"identifier", project.getIdentifier())
+			}
+		} else if oldProject == nil || project.isDifferent(oldProject) {
 			if oldProject == nil {
 				slog.Debug("project is new", "identifier", project.getIdentifier())
 			} else {
@@ -391,8 +418,11 @@ func storeProjects(projects <-chan projecter, coll *mongodb.Collection, wg *sync
 // Go routines.  In contrast, (1) is a synchronous top-level loop in the main
 // function.
 //
-// All three are connected with channels: “projectNumbers” between (1) and (2),
+// All three are connected with channels: “hits” between (1) and (2),
 // and “projects” between (2) and (3).
+//
+// Afterwards, the persons and institutions participating in the crawled
+// projects are downloaded and written to MongoDB, see crawlEntities.
 func main() {
 	var coll *mongodb.Collection
 	{
@@ -405,28 +435,38 @@ func main() {
 			tbr_errors.ExitOnExpectedError(err, "Could not disconnect from MongoDB", 10)
 		}()
 	}
+	personColl, err := initializeEntityCollection(coll.Database(), personKind)
+	tbr_errors.ExitOnExpectedError(err, "Could not initialise persons collection", 10)
+	institutionColl, err := initializeEntityCollection(coll.Database(), institutionKind)
+	tbr_errors.ExitOnExpectedError(err, "Could not initialise institutions collection", 10)
+
+	ctxTicker, cancelTicker := context.WithCancel(context.Background())
+	go enableTicker(ctxTicker, slog.Default())
+	lookups, err = loadLookups()
+	tbr_errors.ExitOnExpectedError(err, "Could not load GEPRIS classifications", 10)
+	err = storeLookups(coll.Database(), lookups)
+	tbr_errors.ExitOnExpectedError(err, "Could not store GEPRIS classifications", 10)
 
 	var projectWorkersWaitGroup sync.WaitGroup
-	projectNumbers := make(chan string, 10*numberProjectWorkers)
+	hits := make(chan apiSearchHit, 10*numberProjectWorkers)
 	projects := make(chan projecter)
 	allProjectNumbers := make(map[string]bool)
 	var allProjectNumbersMutex sync.Mutex
 	for range numberProjectWorkers {
 		projectWorkersWaitGroup.Add(1)
 		go processProjectNumbers(
-			projectNumbers, projects, &projectWorkersWaitGroup, allProjectNumbers, &allProjectNumbersMutex)
+			hits, projects, &projectWorkersWaitGroup, allProjectNumbers, &allProjectNumbersMutex)
 	}
 
 	var projectStorageWaitGroup sync.WaitGroup
 	projectStorageWaitGroup.Add(1)
-	go storeProjects(projects, coll, &projectStorageWaitGroup)
+	references := newEntityReferences()
+	go storeProjects(projects, coll, &projectStorageWaitGroup, references)
 
-	ctxTicker, cancelTicker := context.WithCancel(context.Background())
-	go enableTicker(ctxTicker, slog.Default())
 	for _, year := range getYears() {
 		index := 0
 		for {
-			err := getSearchResults(year, index, projectNumbers)
+			err := getSearchResults(year, index, hits)
 			if errors.Is(err, ErrNoFurtherResults) {
 				break
 			} else if err != nil {
@@ -436,11 +476,18 @@ func main() {
 		}
 	}
 
-	close(projectNumbers)
+	close(hits)
 	projectWorkersWaitGroup.Wait()
-	cancelTicker()
 	close(projects)
 	projectStorageWaitGroup.Wait()
+
+	if os.Getenv("CRAWLER_SKIP_ENTITIES") == "1" {
+		slog.Info("Skipping persons and institutions")
+	} else {
+		crawlEntities(personColl, personKind, references.personIDs)
+		crawlEntities(institutionColl, institutionKind, references.institutionIDs)
+	}
+	cancelTicker()
 
 	denormalizeParentRelations(coll)
 }

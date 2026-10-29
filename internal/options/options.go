@@ -8,6 +8,12 @@ import (
 
 var MongoOpts mongo.Options
 
+// analysisIndices are the fields of the projects collection that are used in
+// typical analysis queries, e.g. “all projects of a person”.
+var analysisIndices = []string{"startYear", "projectId", "parentId", "processKey", "subProcessKey",
+	"personRoles.personId", "institutionRoles.institutionId", "researchSites.institutionId",
+	"classifications.researchAreaKey", "classifications.reviewBoardKey", "classifications.subjectAreaKey"}
+
 func init() {
 	mongoURI := os.Getenv("MONGODB_HOST")
 	if mongoURI == "" {
@@ -17,6 +23,6 @@ func init() {
 		Host:       mongoURI,
 		DBName:     "gepris-new",
 		CollName:   "projects",
-		AddIndices: []string{"endYear"},
+		AddIndices: append([]string{"endYear"}, analysisIndices...),
 	}
 }
