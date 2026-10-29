@@ -21,6 +21,9 @@ Personen und Einrichtungen in MongoDB.
 - Daher: Diffs klein und upstream-tauglich halten; Code-Stil, Kommentare (Englisch,
   typografische Anführungszeichen “…” wie im Original) und Struktur des Originals
   beibehalten. Diese Datei (`CLAUDE.md`) gehört nicht in den Upstream-MR.
+- `cmd/report` ist allgemein und upstream-tauglich; die Berichte in `reports/` (inkl.
+  Vergleichsunis) sind CAU-spezifisch und gehören nicht in den Upstream-MR. Berichte
+  und Beschreibungen dort sind auf Deutsch, CSV-Format für deutsches Excel.
 - Der Commit `PROVISIONAL: Change Mongo DB name` (DB `gepris-new`) ist als provisorisch
   markiert — nicht ohne Rückfrage ändern.
 
