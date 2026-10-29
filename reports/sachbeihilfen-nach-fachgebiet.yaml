@@ -1,0 +1,31 @@
+title: Sachbeihilfen nach Forschungsstelle und Fachgebiet
+description: >
+  Anzahl der Sachbeihilfen mit Förderbeginn im angegebenen Jahr je
+  Forschungsstelle und DFG-Fachgebiet.  Gezählt wird nach Förderbeginn laut
+  GEPRIS („seit“/„von“-Jahr).  Ein Projekt mit mehreren Fachgebieten wird in
+  jedem davon gezählt; die Summe über die Fachgebiete kann daher größer sein
+  als die Zahl der Projekte (siehe Bericht „projekte-nach-verfahren-und-jahr“).
+  Ein Projekt mit mehreren Forschungsstellen zählt bei jeder davon.
+parameters:
+  year: 2025
+pipeline: |
+  [
+    {"$match": {"processKey": "SBH", "startYear": {{.year}},
+                "researchSites.institutionId": {"$in": {{ids .vergleichsunis}}}}},
+    {"$unwind": "$researchSites"},
+    {"$match": {"researchSites.institutionId": {"$in": {{ids .vergleichsunis}}}}},
+    {"$unwind": "$classifications"},
+    {"$group": {"_id": {"siteId": "$researchSites.institutionId", "site": "$researchSites.name",
+                        "areaKey": "$classifications.researchAreaKey",
+                        "area": "$classifications.researchArea"},
+                "projects": {"$addToSet": "$projectId"}}},
+    {"$project": {"_id": 0, "siteId": "$_id.siteId", "site": "$_id.site", "areaKey": "$_id.areaKey",
+                  "area": "$_id.area", "projects": {"$size": "$projects"}}},
+    {"$sort": {"site": 1, "projects": -1, "areaKey": 1}}
+  ]
+columns:
+  - {field: site, header: Forschungsstelle}
+  - {field: siteId, header: Forschungsstelle-ID}
+  - {field: areaKey, header: Fachgebiet-Nr.}
+  - {field: area, header: Fachgebiet}
+  - {field: projects, header: Anzahl Sachbeihilfen}

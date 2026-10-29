@@ -1,0 +1,37 @@
+title: PIs je laufendem SFB/Transregio
+description: >
+  Alle SFB und Transregios mit mindestens einem laufenden Teilprojekt.  „PIs“
+  ist die Zahl der verschiedenen Personen, die ein laufendes Teilprojekt
+  leiten (eine Person mit mehreren Teilprojekten zählt einmal).  SFB in der
+  Auslaufphase haben oft nur noch wenige laufende Teilprojekte und damit wenige
+  PIs.  Mit dem Parameter endYearMin lassen sich SFB ausschließen, deren
+  Förderung vor diesem Jahr endet (SFB ohne bekanntes Endjahr bleiben drin).
+parameters:
+  endYearMin: 0
+pipeline: |
+  [
+    {"$match": {"processKey": "SFB", "type": "umbrella"}},
+    {"$addFields": {"running": {"$filter": {"input": {"$ifNull": ["$subprojects", []]},
+                                            "cond": {"$eq": ["$$this.status", "laufend"]}}}}},
+    {"$project": {"_id": 0, "projectId": 1, "title": 1, "subProcess": 1, "startYear": 1, "endYear": 1,
+                  "endYearOrEmpty": {"$cond": [{"$eq": ["$endYear", 0]}, null, "$endYear"]},
+                  "sites": "$researchSites.name",
+                  "subprojects": {"$size": {"$ifNull": ["$subprojects", []]}},
+                  "runningSubprojects": {"$size": "$running"},
+                  "pis": {"$size": {"$setUnion": [{"$reduce": {
+                    "input": "$running", "initialValue": [],
+                    "in": {"$concatArrays": ["$$value", {"$ifNull": ["$$this.leaderIds", []]}]}}}, []]}}}},
+    {"$match": {"pis": {"$gt": 0},
+                "$or": [{"endYear": 0}, {"endYear": {"$gte": {{.endYearMin}}}}]}},
+    {"$sort": {"pis": -1, "title": 1}}
+  ]
+columns:
+  - {field: title, header: Titel}
+  - {field: projectId, header: Projektnummer}
+  - {field: subProcess, header: Unterverfahren}
+  - {field: sites, header: Forschungsstellen}
+  - {field: startYear, header: Förderbeginn}
+  - {field: endYearOrEmpty, header: Förderende}
+  - {field: subprojects, header: Teilprojekte gesamt}
+  - {field: runningSubprojects, header: Teilprojekte laufend}
+  - {field: pis, header: PIs}

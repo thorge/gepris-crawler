@@ -1,0 +1,34 @@
+title: PIs an laufenden SFB/Transregios – Kennzahlen
+description: >
+  Durchschnitt, Minimum und Maximum der PIs je SFB bzw. Transregio, getrennt
+  und gesamt.  Definitionen wie im Bericht „sfb-pis-je-sfb“; dort stehen auch
+  die einzelnen SFB, z. B. für Median oder Ausreißer.
+parameters:
+  endYearMin: 0
+pipeline: |
+  [
+    {"$match": {"processKey": "SFB", "type": "umbrella"}},
+    {"$addFields": {"running": {"$filter": {"input": {"$ifNull": ["$subprojects", []]},
+                                            "cond": {"$eq": ["$$this.status", "laufend"]}}}}},
+    {"$project": {"subProcess": 1, "endYear": 1,
+                  "pis": {"$size": {"$setUnion": [{"$reduce": {
+                    "input": "$running", "initialValue": [],
+                    "in": {"$concatArrays": ["$$value", {"$ifNull": ["$$this.leaderIds", []]}]}}}, []]}}}},
+    {"$match": {"pis": {"$gt": 0},
+                "$or": [{"endYear": 0}, {"endYear": {"$gte": {{.endYearMin}}}}]}},
+    {"$facet": {
+      "bySubProcess": [{"$group": {"_id": "$subProcess", "count": {"$sum": 1}, "average": {"$avg": "$pis"},
+                                   "min": {"$min": "$pis"}, "max": {"$max": "$pis"}}},
+                       {"$sort": {"_id": 1}}],
+      "total": [{"$group": {"_id": "gesamt", "count": {"$sum": 1}, "average": {"$avg": "$pis"},
+                            "min": {"$min": "$pis"}, "max": {"$max": "$pis"}}}]}},
+    {"$project": {"rows": {"$concatArrays": ["$bySubProcess", "$total"]}}},
+    {"$unwind": "$rows"},
+    {"$replaceRoot": {"newRoot": "$rows"}}
+  ]
+columns:
+  - {field: _id, header: Verfahren}
+  - {field: count, header: Anzahl}
+  - {field: average, header: PIs Durchschnitt, decimals: 1}
+  - {field: min, header: PIs Minimum}
+  - {field: max, header: PIs Maximum}

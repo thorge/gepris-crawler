@@ -1,0 +1,34 @@
+title: Projekte nach Forschungsstelle, Verfahren und Förderbeginn
+description: >
+  Anzahl der Projekte je Forschungsstelle, DFG-Verfahren und Jahr des
+  Förderbeginns.  „Projekte“ sind eigenständige Projekte, „Teilprojekte“ sind
+  Projekte innerhalb eines Rahmenprojekts (z. B. Teilprojekte eines SFB oder
+  Einzelprojekte eines Schwerpunktprogramms).  Transregios zählen zum
+  Verfahren SFB; die Variante steht in der Spalte „Unterverfahren“.
+parameters:
+  fromYear: 2020
+  toYear: 2025
+pipeline: |
+  [
+    {"$match": {"startYear": {"$gte": {{.fromYear}}, "$lte": {{.toYear}}},
+                "researchSites.institutionId": {"$in": {{ids .vergleichsunis}}}}},
+    {"$unwind": "$researchSites"},
+    {"$match": {"researchSites.institutionId": {"$in": {{ids .vergleichsunis}}}}},
+    {"$group": {"_id": {"site": "$researchSites.name", "siteId": "$researchSites.institutionId",
+                        "processKey": "$processKey", "process": "$mainProcess",
+                        "subProcess": "$subProcess", "year": "$startYear"},
+                "projects": {"$sum": {"$cond": [{"$eq": ["$parentId", 0]}, 1, 0]}},
+                "subprojects": {"$sum": {"$cond": [{"$eq": ["$parentId", 0]}, 0, 1]}}}},
+    {"$replaceRoot": {"newRoot": {"$mergeObjects": ["$_id",
+                                                    {"projects": "$projects", "subprojects": "$subprojects"}]}}},
+    {"$sort": {"site": 1, "processKey": 1, "subProcess": 1, "year": 1}}
+  ]
+columns:
+  - {field: site, header: Forschungsstelle}
+  - {field: siteId, header: Forschungsstelle-ID}
+  - {field: processKey, header: Verfahren-Kürzel}
+  - {field: process, header: Verfahren}
+  - {field: subProcess, header: Unterverfahren}
+  - {field: year, header: Förderbeginn}
+  - {field: projects, header: Projekte}
+  - {field: subprojects, header: Teilprojekte}

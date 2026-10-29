@@ -1,0 +1,15 @@
+# Gemeinsame Parameter für alle Berichte.  Jeder Bericht kann sie in seinem
+# Abschnitt „parameters“ überschreiben, und beim Aufruf geht das mit
+# „-param name=wert“.
+#
+# Die IDs der Forschungsstellen findet man in der Datenbank mit
+#   db.lookups.find({table: "researchSites", name: /Kiel/})
+# Die Namen hier dienen nur der Lesbarkeit; in den Berichten erscheinen die
+# Namen aus GEPRIS.
+
+# PLATZHALTER: Bitte durch die tatsächlichen Vergleichsunis ersetzen.
+vergleichsunis:
+  - {id: 10337, name: Christian-Albrechts-Universität zu Kiel}
+  - {id: 10345, name: Universität Rostock}
+  - {id: 10382, name: Universität Greifswald}
+  - {id: 10499, name: Universität zu Lübeck}
